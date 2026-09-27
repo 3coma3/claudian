@@ -27,11 +27,12 @@ export class TabSession {
     private readonly state: TabSessionState,
     private readonly coordinator: ChatExecutionCoordinator,
     private readonly onWorkChanged?: () => void,
+    private readonly isConversationBusy: () => boolean = () => false,
   ) {
     this.turns = new TurnCoordinator(() => {
       this.onWorkChanged?.();
       if (!this.turns.isActive) this.coordinator.notifyMayCool();
-    });
+    }, () => this.acceptsIntents && this.lifecycleState !== 'closing' && !this.identitySealed && !this.isConversationBusy());
   }
 
   get id(): string { return this.state.id; }
@@ -43,6 +44,16 @@ export class TabSession {
   get acceptsIntents(): boolean { return this.intentAdmissionPauseDepth === 0; }
   get userOwnershipRevision(): number { return this.userOwnershipRevisionValue; }
   get identityRevision(): number { return this.identityRevisionValue; }
+
+  get canNavigateConversation(): boolean {
+    return this.acceptsIntents && this.lifecycleState !== 'closing' && !this.identitySealed
+      && !this.turns.isActive && !this.coordinator.hasBackgroundWork && !this.isConversationBusy();
+  }
+
+  async runConversationNavigation(operation: (signal: AbortSignal) => Promise<unknown>): Promise<void> {
+    if (!this.canNavigateConversation) return;
+    await this.turns.run(async signal => { await operation(signal); }, 'navigation');
+  }
 
   bindConversation(conversationId: string | null, providerId: ProviderId | null): void {
     this.replaceIdentity(conversationId, providerId, null);
