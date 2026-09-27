@@ -27,11 +27,13 @@ import type {
   ImageAttachment,
   ProviderId,
 } from '@/core/types';
+import { throwIfAborted } from '@/utils/abort';
 import { toError } from '@/utils/error';
 
 import {
   ExecutionSessionSupervisor,
 } from './ExecutionSessionSupervisor';
+import { withExecutionUsageModel } from './usageModel';
 import type { WarmExecutionPool } from './WarmExecutionPool';
 
 export type ChatExecutionCoordinatorState =
@@ -152,7 +154,8 @@ interface SessionBinding {
   lastSnapshotRevision: number;
   pendingWorkCount: number;
   sessionSequence: number;
-  readonly backgroundSequences: Map<string, number>;
+  readonly backgroundTurns: Map<string, { sequence: number; model: string | undefined }>;
+  model?: string;
   readonly completedBackgroundTurns: Set<string>;
 }
 
@@ -199,6 +202,7 @@ export class ChatExecutionCoordinator {
   #conversation: ChatExecutionConversationBinding | null = null;
   #sessionBinding: SessionBinding | null = null;
   #activeExecution: ActiveExecution | null = null;
+  #requestController: AbortController | null = null;
   readonly #pendingInteractions = new Map<string, PendingInteraction>();
   readonly #pendingSteerAttempts = new Map<string, PendingSteerAttempt>();
   #disposed = false;
@@ -235,7 +239,7 @@ export class ChatExecutionCoordinator {
   }
 
   get hasBackgroundWork(): boolean {
-    return (this.#sessionBinding?.backgroundSequences.size ?? 0) > 0;
+    return (this.#sessionBinding?.backgroundTurns.size ?? 0) > 0;
   }
 
   isEventContextCurrent(context: ChatExecutionEventContext): boolean {
@@ -326,7 +330,7 @@ export class ChatExecutionCoordinator {
         lastSnapshotRevision: -1,
         pendingWorkCount: 0,
         sessionSequence: 0,
-        backgroundSequences: new Map(),
+        backgroundTurns: new Map(),
         completedBackgroundTurns: new Set(),
       };
       this.#sessionBinding = binding;
@@ -356,23 +360,33 @@ export class ChatExecutionCoordinator {
     }
   }
 
-  async execute(submission: ChatTurnSubmission): Promise<ChatExecutionResult> {
-    return this.#runProtectedOperation(() => this.#executeProtected(submission));
+  async execute(submission: ChatTurnSubmission, signal?: AbortSignal): Promise<ChatExecutionResult> {
+    this.#assertAvailable();
+    if (this.#requestController) throw new Error('A chat execution is already active');
+    const controller = new AbortController();
+    this.#requestController = controller;
+    const cancel = () => this.cancel();
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) controller.abort();
+    try {
+      return await this.#runProtectedOperation(() => this.#executeProtected(submission, controller));
+    } finally {
+      signal?.removeEventListener('abort', cancel);
+      this.#requestController = null;
+    }
   }
 
   async #executeProtected(
     submission: ChatTurnSubmission,
+    requestController: AbortController,
   ): Promise<ChatExecutionResult> {
-    this.#assertAvailable();
-    if (this.#activeExecution) {
-      throw new Error('A chat execution is already active');
-    }
     const conversation = this.#requireConversation();
-    const requestController = new AbortController();
     let binding: SessionBinding;
     let run: ProviderExecutionRun;
     try {
+      throwIfAborted(requestController.signal, 'Turn cancelled before provider handoff');
       await this.prepare();
+      throwIfAborted(requestController.signal, 'Turn cancelled before provider handoff');
       if (!sameConversationBinding(conversation, this.#conversation)) {
         throw new Error('Chat execution binding changed before provider handoff');
       }
@@ -385,7 +399,9 @@ export class ChatExecutionCoordinator {
       if (!sameConversationBinding(conversation, this.#conversation)) {
         throw new Error('Chat execution binding changed before provider handoff');
       }
+      throwIfAborted(requestController.signal, 'Turn cancelled before provider handoff');
       binding = this.#requireCurrentSessionBinding();
+      binding.model = submission.configuration.model;
       run = binding.session.execute(
         createExecutionRequest(submission, requestController.signal),
       );
@@ -413,6 +429,8 @@ export class ChatExecutionCoordinator {
   }
 
   cancel(): void {
+    if (this.#requestController?.signal.aborted) return;
+    this.#requestController?.abort();
     const active = this.#activeExecution;
     if (!active) return;
     active.terminationOverride = 'cancelled';
@@ -601,7 +619,7 @@ export class ChatExecutionCoordinator {
       && this.#activeExecution === null
       && this.#pendingInteractions.size === 0
       && this.#pendingSteerAttempts.size === 0
-      && binding.backgroundSequences.size === 0
+      && binding.backgroundTurns.size === 0
       && binding.pendingWorkCount === 0
       && (this.deps.warmExecution?.canCool() ?? true),
     );
@@ -694,7 +712,7 @@ export class ChatExecutionCoordinator {
 
       try {
         await this.deps.onRequestedEvent?.(
-          event,
+          withExecutionUsageModel(event, active.submission.configuration.model),
           this.#createEventContext(active.binding, active.submission.submissionId),
         );
       } catch (error) {
@@ -812,7 +830,7 @@ export class ChatExecutionCoordinator {
     if (event.scope.sessionInstanceId !== binding.session.sessionInstanceId) return;
 
     if (event.scope.kind === 'background') {
-      const previous = binding.backgroundSequences.get(event.scope.turnId);
+      const previous = binding.backgroundTurns.get(event.scope.turnId);
       if (event.type === 'background_turn_started') {
         if (
           previous !== undefined
@@ -821,13 +839,13 @@ export class ChatExecutionCoordinator {
         ) {
           return;
         }
-        const wasIdle = binding.backgroundSequences.size === 0;
-        binding.backgroundSequences.set(event.scope.turnId, event.scope.sequence);
+        const wasIdle = binding.backgroundTurns.size === 0;
+        binding.backgroundTurns.set(event.scope.turnId, { sequence: event.scope.sequence, model: binding.model });
         if (wasIdle) this.deps.onBackgroundWorkChanged?.(true);
         this.#fireAndReport(this.#touchWarmSlot());
       } else {
-        if (previous === undefined || event.scope.sequence <= previous) return;
-        binding.backgroundSequences.set(event.scope.turnId, event.scope.sequence);
+        if (previous === undefined || event.scope.sequence <= previous.sequence) return;
+        previous.sequence = event.scope.sequence;
       }
     } else {
       if (event.scope.sequence <= binding.sessionSequence) return;
@@ -840,16 +858,20 @@ export class ChatExecutionCoordinator {
     }
     try {
       eventWork.push(Promise.resolve(
-        this.deps.onSessionEvent?.(event, this.#createEventContext(binding)),
+        this.deps.onSessionEvent?.(
+          withExecutionUsageModel(event, event.scope.kind === 'background'
+            ? binding.backgroundTurns.get(event.scope.turnId)?.model : undefined),
+          this.#createEventContext(binding),
+        ),
       ));
     } catch (error) {
       eventWork.push(Promise.reject(toError(error, 'Session event handler failed')));
     }
     this.#trackBindingWork(binding, Promise.all(eventWork));
     if (event.type === 'background_turn_completed') {
-      binding.backgroundSequences.delete(event.scope.turnId);
+      binding.backgroundTurns.delete(event.scope.turnId);
       binding.completedBackgroundTurns.add(event.scope.turnId);
-      if (binding.backgroundSequences.size === 0) {
+      if (binding.backgroundTurns.size === 0) {
         this.deps.onBackgroundWorkChanged?.(false);
       }
       this.notifyMayCool();
@@ -899,7 +921,7 @@ export class ChatExecutionCoordinator {
     const binding = this.#sessionBinding;
     if (!binding) return;
     this.#sessionBinding = null;
-    if (binding.backgroundSequences.size > 0) {
+    if (binding.backgroundTurns.size > 0) {
       this.deps.onBackgroundWorkChanged?.(false);
     }
     this.#stale = true;
@@ -915,7 +937,7 @@ export class ChatExecutionCoordinator {
   async #releaseSessionBinding(): Promise<void> {
     const binding = this.#sessionBinding;
     this.#sessionBinding = null;
-    if (binding && binding.backgroundSequences.size > 0) {
+    if (binding && binding.backgroundTurns.size > 0) {
       this.deps.onBackgroundWorkChanged?.(false);
     }
     try {
@@ -1137,7 +1159,7 @@ export class ChatExecutionCoordinator {
       return false;
     }
     if (this.#activeExecution?.run.turnId === request.turnId) return true;
-    return binding.backgroundSequences.has(request.turnId);
+    return binding.backgroundTurns.has(request.turnId);
   }
 
   #dismissInteractionsForTurn(

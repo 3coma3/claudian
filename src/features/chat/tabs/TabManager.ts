@@ -1134,7 +1134,7 @@ export class TabManager implements TabManagerInterface {
     const tab = this.getTab(tabId);
     if (!tab) return false;
     return tab.state.isStreaming
-      || tab.session.activeTurn !== null
+      || tab.session.turns.isActive
       || tab.executionCoordinator.hasBackgroundWork
       || tab.services.subagentManager.hasActiveAsyncSubagents()
       // Collapsed side work stays discoverable from the tab bar.
@@ -2324,6 +2324,7 @@ export class TabManager implements TabManagerInterface {
     this.shutdownSnapshotOpen = true;
     for (const tab of this.getAllTabs()) {
       tab.session.pauseIntentAdmission();
+      tab.session.turns.cancel('shutdown');
     }
   }
 
