@@ -69,6 +69,7 @@ import { mergeReportedUsage } from '../utils/usageInfo';
 import { StreamingRenderCoordinator } from './StreamingRenderCoordinator';
 
 export interface StreamControllerDeps {
+  onQuestionToolChanged?: (tool: ToolCallInfo) => void;
   plugin: ChatFeatureHost;
   state: ChatState;
   renderer: MessageRenderer;
@@ -390,6 +391,7 @@ export class StreamController {
         }
         // If still pending, the updated input is already in the toolCall object
       }
+      this.deps.onQuestionToolChanged?.(existingToolCall);
       this.#ensureRegularToolCallVisibility(existingToolCall, msg);
       return;
     }
@@ -406,6 +408,7 @@ export class StreamController {
     };
     msg.toolCalls = msg.toolCalls || [];
     msg.toolCalls.push(toolCall);
+    this.deps.onQuestionToolChanged?.(toolCall);
 
     // Add to contentBlocks for ordering
     msg.contentBlocks = msg.contentBlocks || [];
@@ -545,7 +548,7 @@ export class StreamController {
       state.toolCallElements.set(toolId, writeEditState.wrapperEl);
     } else {
       renderToolCall(parentEl, toolCall, state.toolCallElements, {
-        initiallyExpanded: toolCall.name === TOOL_APPLY_PATCH && this.#shouldExpandFileEditsByDefault(),
+        initiallyExpanded: toolCall.name === TOOL_APPLY_PATCH ? this.#shouldExpandFileEditsByDefault() : false,
       });
     }
     state.pendingTools.delete(toolId);
@@ -792,6 +795,7 @@ export class StreamController {
           extractResolvedAnswers(chunk.toolUseResult) ??
           extractResolvedAnswersFromResultText(normalizedContent);
         if (answers) existingToolCall.resolvedAnswers = answers;
+        this.deps.onQuestionToolChanged?.(existingToolCall);
       }
 
       const writeEditState = state.writeEditStates.get(chunk.id);

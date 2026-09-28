@@ -49,7 +49,7 @@ import {
   renderStoredSubagent,
 } from './SubagentRenderer';
 import { renderStoredThinkingBlock } from './ThinkingBlockRenderer';
-import { renderStoredToolCall } from './ToolCallRenderer';
+import { renderStoredToolCall, updateToolCallResult } from './ToolCallRenderer';
 import { createWelcomeElement } from './WelcomeRenderer';
 import { renderStoredWriteEdit } from './WriteEditRenderer';
 
@@ -86,6 +86,14 @@ export class MessageRenderer {
   private readonly imagePreviewModal = new ImagePreviewModal();
   private isDisposed = false;
   private readonly contentRenders = new WeakMap<HTMLElement, object>();
+
+  updateQuestionTool(tool: ToolCallInfo): void {
+    for (const element of this.messagesEl.querySelectorAll<HTMLElement>('[data-tool-id]')) {
+      if (element.dataset.toolId === tool.id) {
+        updateToolCallResult(tool.id, tool, new Map([[tool.id, element]]));
+      }
+    }
+  }
 
   constructor(
     plugin: ChatFeatureHost,
@@ -186,6 +194,9 @@ export class MessageRenderer {
    * Returns the message element for content updates.
    */
   addMessage(msg: ChatMessage): HTMLElement {
+    if (msg.role === 'user' && msg.displayContent === '' && !msg.images?.length) {
+      return this.messagesEl;
+    }
     if (this.getCapabilities().forkMode === 'full-session') {
       this.messagesEl.querySelectorAll('.claudian-message-fork-btn').forEach(button => button.remove());
     }
@@ -286,7 +297,7 @@ export class MessageRenderer {
 
     // Skip rebuilt context messages (history sent to SDK on session reset)
     // These are internal context for the AI, not actual user messages to display
-    if (msg.isRebuiltContext) {
+    if (msg.isRebuiltContext || (msg.role === 'user' && msg.displayContent === '' && !msg.images?.length)) {
       return;
     }
 
@@ -610,7 +621,7 @@ export class MessageRenderer {
       this.#renderProviderLifecycleSubagent(contentEl, toolCall, msg);
     } else {
       renderStoredToolCall(contentEl, toolCall, {
-        initiallyExpanded: toolCall.name === TOOL_APPLY_PATCH && this.#shouldExpandFileEditsByDefault(),
+        initiallyExpanded: toolCall.name === TOOL_APPLY_PATCH ? this.#shouldExpandFileEditsByDefault() : toolCall.input.replyMode === 'user-message' ? undefined : false,
       });
     }
   }

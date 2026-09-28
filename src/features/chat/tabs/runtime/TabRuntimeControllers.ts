@@ -168,6 +168,7 @@ export function buildTabRuntimeControllers(
   );
 
   const streamController = new StreamController({
+    onQuestionToolChanged: tool => runtimeRef.requirePublished().controllers.inputController.updateAsyncQuestion(tool),
     plugin,
     state,
     renderer,
@@ -340,6 +341,7 @@ export function buildTabRuntimeControllers(
     onDestinationChanged: () => {
       const tab = runtimeRef.current();
       if (!tab) return;
+      tab.controllers.inputController.setPromptActive(tab.controllers.sideChatController.destination === 'main');
       if (tab.controllers.sideChatController.destination === 'side') conversationController.cancelBranchDraft();
       ui.composerDropdown.setBuiltInsEnabled(
         tab.controllers.sideChatController.destination === 'main',

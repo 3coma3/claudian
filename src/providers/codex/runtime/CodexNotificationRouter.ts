@@ -7,6 +7,7 @@ import {
   normalizeCodexMemoryCitation,
   stripCodexMemoryCitationMarkup,
 } from '../normalization/CodexMemoryCitation';
+import { parseCodexQuestionReply } from '../normalization/codexQuestionNormalization';
 import {
   appendCodexCommandOutput,
   decodeCodexExecEnvelopeCalls,
@@ -366,6 +367,7 @@ export class CodexNotificationRouter {
 
   #onItemStarted(params: ItemStartedNotification): void {
     const item = params.item;
+    if (item.type === 'agentMessage' && this.#handleAsyncQuestion(item, false)) return;
     const itemId = getItemId(item);
     const deferredOwned = this.#claimDeferredRawExecFromItem(item, false);
     if (item.type === 'commandExecution' && !deferredOwned) {
@@ -443,6 +445,7 @@ export class CodexNotificationRouter {
 
   #onItemCompleted(params: ItemCompletedNotification): void {
     const item = params.item;
+    if (item.type === 'agentMessage' && this.#handleAsyncQuestion(item, true)) return;
     if (item.type === 'subAgentActivity') {
       // Resumed threads can omit raw function calls. Keep an interaction anchor so
       // session-owned child updates have a tool to attach to when work starts.
@@ -587,8 +590,10 @@ export class CodexNotificationRouter {
         this.#handleRawToolOutput(item);
         break;
 
+      case 'agent_message':
       case 'agentMessage':
       case 'message':
+        if (this.#handleAsyncQuestion(item as unknown as AgentMessageItem, true)) break;
         this.#emitMissingRawAgentMessageText(item);
         break;
 
@@ -694,12 +699,12 @@ export class CodexNotificationRouter {
       const expectedCalls = decodeCodexExecEnvelopeCalls(rawArguments);
       const isSingleCommand = expectedCalls?.length === 1
         && expectedCalls[0]?.name === 'Bash';
-      if (!isSingleCommand) {
+      if (expectedCalls && !isSingleCommand) {
         this.#deferredRawExecCalls.set(callId, {
           callId,
           item,
           rawArguments,
-          expectedCalls: (expectedCalls ?? []).map((call) => {
+          expectedCalls: expectedCalls.map((call) => {
             const semanticCall = projectRawSemanticToolCall(
               call.name,
               call.input,
@@ -876,7 +881,7 @@ export class CodexNotificationRouter {
     };
 
     if (this.#immediateRawOutputCallIds.delete(callId)) {
-      const execCellId = normalizedName === 'Bash'
+      const execCellId = normalizedName === 'Bash' || normalizedName === 'exec'
         ? extractCodexExecCellId(rawOutputText)
         : undefined;
       if (execCellId) {
@@ -918,7 +923,7 @@ export class CodexNotificationRouter {
   #handleWrappedWaitOutput(waitCall: WrappedWaitCall, rawOutput: unknown): void {
     const rawOutputText = stringifyCodexToolOutput(rawOutput);
     const content = normalizeRawToolOutput(
-      'Bash',
+      this.#rawToolNamesByCallId.get(waitCall.commandCallId) ?? 'Bash',
       rawOutput,
       this.#rawToolInputsByCallId.get(waitCall.commandCallId),
     );
@@ -1307,6 +1312,13 @@ export class CodexNotificationRouter {
     }
 
     const { deferredExec, expectedCall } = match;
+    if (projectedName === 'WebSearch' && canonicalItemId
+      && (Array.isArray(expectedCall.input.actions) || expectedCall.input.actionType === 'click')) {
+      this.#rawToolInputsByCallId.set(canonicalItemId, expectedCall.input);
+      if (this.#seenWebSearchIds.has(canonicalItemId)) {
+        this.emit({ type: 'tool_use', id: canonicalItemId, name: 'WebSearch', input: expectedCall.input });
+      }
+    }
     if (expectedCall.fallbackId && canonicalItemId) this.rawExecAliases.set(canonicalItemId, expectedCall.fallbackId);
     expectedCall.claimed = true;
     expectedCall.canonicalItemId = canonicalItemId;
@@ -1585,7 +1597,7 @@ export class CodexNotificationRouter {
       type: 'tool_use',
       id: item.id,
       name: 'WebSearch',
-      input: normalizeCodexToolInput('web_search', {
+      input: this.#rawToolInputsByCallId.get(item.id) ?? normalizeCodexToolInput('web_search', {
         query: item.query ?? '',
         queries: item.queries ?? [],
         url: item.url ?? '',
@@ -1741,17 +1753,29 @@ export class CodexNotificationRouter {
 
     const rawContent = this.#extractUserMessageText(item.content);
     const visibleContent = extractCodexUserVisibleText(rawContent);
+    const isQuestionReply = parseCodexQuestionReply(rawContent).length > 0;
     this.#startedUserMessageIds.add(item.id);
 
-    if (visibleContent === null && rawContent.trim()) {
+    if (visibleContent === null && rawContent.trim() && !isQuestionReply) {
       return;
     }
 
     this.emit({
       type: 'user_message_start',
       itemId: item.id,
-      content: visibleContent ?? rawContent,
+      content: visibleContent ?? (isQuestionReply ? '' : rawContent),
     });
+  }
+
+  #handleAsyncQuestion(item: AgentMessageItem, completed: boolean): boolean {
+    if (item.delivery !== 'async' || !Array.isArray(item.questions) || item.questions.length === 0) return false;
+    this.#emitRawToolUse(item.id, 'request_user_input_async', {}, { questions: item.questions });
+    if (completed && !this.#emittedImmediateToolResultIds.has(item.id)) {
+      this.#emittedImmediateToolResultIds.add(item.id);
+      this.#rawToolOutputsByCallId.delete(item.id);
+      this.emit({ type: 'tool_result', id: item.id, content: 'Question sent. Awaiting your reply.', isError: false });
+    }
+    return true;
   }
 
   #emitAgentMessageBoundary(item: AgentMessageItem): void {
@@ -2108,12 +2132,6 @@ function projectRawSemanticToolCall(
   input: Record<string, unknown>;
   comparisonInput?: Record<string, unknown>;
 } {
-  if (name === 'web__run') {
-    return {
-      name: 'WebSearch',
-      input: normalizeWebRunInput(input),
-    };
-  }
   if (rawName === 'update_plan') {
     const explanation = firstString(rawInput?.explanation);
     return {
@@ -2144,39 +2162,6 @@ function projectRawSemanticToolCall(
   return { name: semanticToolName(name), input };
 }
 
-function normalizeWebRunInput(input: Record<string, unknown>): Record<string, unknown> {
-  const regularQueries: unknown[] = Array.isArray(input.search_query)
-    ? input.search_query as unknown[]
-    : [];
-  const imageQueries: unknown[] = Array.isArray(input.image_query)
-    ? input.image_query as unknown[]
-    : [];
-  const searchQueries = [...regularQueries, ...imageQueries];
-  const queries = searchQueries
-    .map(query => firstString(asRecord(query)?.q))
-    .filter(Boolean);
-  if (queries.length > 0) {
-    return {
-      actionType: 'search',
-      query: queries[0],
-      ...(queries.length > 1 ? { queries } : {}),
-    };
-  }
-
-  const openRequest = asRecord(Array.isArray(input.open) ? input.open[0] : undefined);
-  const openUrl = firstString(openRequest?.ref_id, openRequest?.url);
-  if (openUrl) {
-    return { actionType: 'open_page', url: openUrl };
-  }
-
-  const findRequest = asRecord(Array.isArray(input.find) ? input.find[0] : undefined);
-  const findUrl = firstString(findRequest?.ref_id, findRequest?.url);
-  const pattern = firstString(findRequest?.pattern);
-  if (findUrl && pattern) {
-    return { actionType: 'find_in_page', url: findUrl, pattern };
-  }
-  return input;
-}
 
 function toolInputsCompatible(
   name: string,
@@ -2196,6 +2181,12 @@ function toolInputsCompatible(
   }
 
   if (name === 'WebSearch') {
+    if (Array.isArray(expected.actions) && expected.actions.length > 1) {
+      return expected.actions.some(action => {
+        const record = asRecord(action);
+        return record !== null && toolInputsCompatible(name, record, actual, workingDirectory);
+      });
+    }
     const expectedWeb = normalizeComparedWebInput(expected);
     const actualWeb = normalizeComparedWebInput(actual);
     // Native reference-based opens and clicks can expose only an `other` action.
@@ -2203,7 +2194,7 @@ function toolInputsCompatible(
     if (
       actualWeb.actionType === 'other'
       && (expectedWeb.actionType === 'open_page'
-        || (Array.isArray(expectedWeb.click) && expectedWeb.click.length > 0))
+        || expectedWeb.actionType === 'click')
     ) {
       return true;
     }
