@@ -152,6 +152,7 @@ function applyModelRecoverySource(
 
 export class ConversationRepository {
   private conversations: Conversation[] = [];
+  private readonly recordsById = new Map<string, Conversation>();
   private hydratedConversationIds = new Set<string>();
   private hydrationPromises = new Map<string, Promise<Conversation | null>>();
   private conversationGenerations = new Map<string, number>();
@@ -191,6 +192,8 @@ export class ConversationRepository {
     this.conversations = conversations.filter(
       ({ id }) => !this.deletedConversationIds.has(id),
     );
+    this.recordsById.clear();
+    for (const record of this.conversations) this.recordsById.set(record.id, record);
     this.metadataTargets.clear();
     for (const conversation of this.conversations) {
       this.metadataTargets.set(conversation.id, 'device');
@@ -311,6 +314,7 @@ export class ConversationRepository {
     }
 
     this.conversations.push(...added);
+    for (const record of added) this.recordsById.set(record.id, record);
     this.conversations.sort(
       (left, right) =>
         right.lastActivityAt - left.lastActivityAt,
@@ -335,6 +339,7 @@ export class ConversationRepository {
       const index = this.conversations.indexOf(shell);
       if (index === -1) continue;
       this.conversations.splice(index, 1);
+      this.recordsById.delete(shell.id);
       this.hydratedConversationIds.delete(shell.id);
       this.hydrationPromises.delete(shell.id);
       this.executionBindings.delete(shell.id);
@@ -388,6 +393,7 @@ export class ConversationRepository {
 
     this.metadataTargets.set(conversation.id, 'device');
     this.conversations.unshift(conversation);
+    this.recordsById.set(conversation.id, conversation);
     this.#captureLinkedContentIdentity(conversation);
     if (!sessionId) {
       this.hydratedConversationIds.add(conversation.id);
@@ -445,6 +451,7 @@ export class ConversationRepository {
     this.deletingConversationIds.add(id);
     this.deletedConversationIds.add(id);
     this.conversations.splice(index, 1);
+    this.recordsById.delete(id);
     this.hydratedConversationIds.delete(id);
     this.hydrationPromises.delete(id);
     this.#invalidateConversation(id);
@@ -476,6 +483,7 @@ export class ConversationRepository {
           0,
           conversation,
         );
+        this.recordsById.set(id, conversation);
         if (conversation.messages.length > 0) {
           this.hydratedConversationIds.add(id);
         }
@@ -602,7 +610,10 @@ export class ConversationRepository {
     ));
   }
 
-  /** Serializes a metadata decision through persistence and committed publication. */
+  /**
+   * Serializes a metadata decision through persistence and committed publication.
+   * `createPatch` must return a repository-owned patch; it is committed without another copy.
+   */
   #mutateMetadata(
     id: string,
     createPatch: (conversation: Conversation) => ConversationMutablePatch | null,
@@ -630,7 +641,8 @@ export class ConversationRepository {
       if (!this.#isConversationRetained(conversation)) return;
       // Session invalidation cannot cancel an unrelated committed title or pin edit.
       discardSupersededSessionFields();
-      Object.assign(conversation, structuredClone(patch));
+      // update() already cloned caller input and #writeMetadata keeps only its own projection.
+      Object.assign(conversation, patch);
       if ('sessionId' in patch || 'providerState' in patch || 'resumeAtMessageId' in patch) {
         this.hydratedConversationIds.delete(id);
         this.#invalidateConversation(id);
@@ -1099,9 +1111,7 @@ export class ConversationRepository {
   }
 
   #getRecord(id: string): Conversation | null {
-    const conversation = this.conversations.find(
-      (conversation) => conversation.id === id,
-    ) ?? null;
+    const conversation = this.recordsById.get(id) ?? null;
     if (conversation) {
       this.#restoreLinkedContentIdentity(conversation);
     }
@@ -1546,7 +1556,9 @@ export class ConversationRepository {
     conversation: Conversation,
     options: { preserveProviderState?: boolean } = {},
   ): Promise<void> {
-    const metadata = this.toSessionMetadata(structuredClone(conversation), options);
+    // Metadata excludes message history: snapshot the projection, not the whole conversation.
+    // The shallow copy keeps projection-time repairs off the caller's record.
+    const metadata = structuredClone(this.toSessionMetadata({ ...conversation }, options));
     const target = this.#requireMetadataTarget(conversation.id);
     return target === 'device'
       ? this.persistence.saveMetadata(metadata)

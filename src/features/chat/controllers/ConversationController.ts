@@ -27,6 +27,8 @@ import type { ChatState } from '../state/ChatState';
 import type { TabSession } from '../tabs/TabSession';
 
 const MAX_REWIND_CONFLICT_PATHS = 5;
+/** Longest a progress-only change waits for its coalesced save. */
+const PROGRESS_SAVE_DELAY_MS = 1_000;
 
 function buildRewindConflictConfirmation(conflicts: readonly ChatRewindConflict[]): string {
   const visiblePaths = conflicts
@@ -88,6 +90,7 @@ export class ConversationController {
   private branchState: BranchState = { kind: 'idle' };
   private switchRequestRevision = 0;
   private switchTail: Promise<void> = Promise.resolve();
+  private pendingProgressSave: { supersede: () => void } | null = null;
 
   constructor(deps: ConversationControllerDeps, callbacks: ConversationCallbacks = {}) {
     this.deps = deps;
@@ -207,6 +210,7 @@ export class ConversationController {
 
       this.deps.getLinkedContentController().resetAutoDraft();
 
+      this.deps.state.writeEditStates.clear();
       const welcomeEl = renderer.renderMessages(
         [],
         () => this.getGreeting()
@@ -441,6 +445,7 @@ export class ConversationController {
         ?? userMsg.content;
       this.deps.drafts.restore('main', { content: restoredContent, images: userMsg.images }, { focus: true, notify: true });
 
+      this.deps.state.writeEditStates.clear();
       const welcomeEl = renderer.renderMessages(state.messages, () => this.getGreeting());
       this.deps.setWelcomeEl(welcomeEl);
       this.updateWelcomeVisibility();
@@ -491,10 +496,11 @@ export class ConversationController {
       await navigation.runConversationNavigation(signal => this.#changeBranch(undefined, undefined, signal));
       return;
     }
-    const message = state.messages.find(item => item.id === messageId);
+    const messages = state.messages;
+    const message = messages.find(item => item.id === messageId);
     const conversationId = state.currentConversationId;
     if (!conversationId || !message || message.role !== 'user' || message.isInterrupt || message.isRebuiltContext) return;
-    if (state.messages.find(item => item.role === 'user' && !item.isInterrupt && !item.isRebuiltContext) === message) return;
+    if (messages.find(item => item.role === 'user' && !item.isInterrupt && !item.isRebuiltContext) === message) return;
     if (!message.userMessageId) {
       new Notice('Branching is available after this prompt is saved.');
       return;
@@ -508,7 +514,8 @@ export class ConversationController {
       this.branchState = { kind: 'preview', draft: { conversationId, message, previousDraft,
         scrollTop: this.deps.getMessagesEl().scrollTop } };
       const content = message.displayContent ?? extractUserDisplayContent(message.content) ?? message.content;
-      this.deps.setWelcomeEl(renderer.renderMessages(state.messages.slice(0, state.messages.indexOf(message)), () => this.getGreeting()));
+      this.deps.state.writeEditStates.clear();
+      this.deps.setWelcomeEl(renderer.renderMessages(messages.slice(0, messages.indexOf(message)), () => this.getGreeting()));
       drafts.restore('main', { content, images: message.images }, { focus: true, notify: true });
       return;
     }
@@ -522,6 +529,7 @@ export class ConversationController {
     const { state, renderer } = this.deps;
     if (this.deps.isDisposed?.() || state.currentConversationId !== draft.conversationId) return;
     this.deps.drafts.restore('main', draft.previousDraft);
+    this.deps.state.writeEditStates.clear();
     this.deps.setWelcomeEl(renderer.renderMessages(state.messages, () => this.getGreeting()));
     this.updateWelcomeVisibility();
     this.deps.getMessagesEl().scrollTop = draft.scrollTop;
@@ -578,8 +586,10 @@ export class ConversationController {
           const restored = state.messages.find(item => item.userMessageId === draft!.message.userMessageId);
           draft = restored ? { ...draft, message: restored } : undefined;
         }
+        const messages = state.messages;
         const visible = result.status === 'cancelled' && draft
-          ? state.messages.slice(0, state.messages.indexOf(draft.message)) : state.messages;
+          ? messages.slice(0, messages.indexOf(draft.message)) : messages;
+        this.deps.state.writeEditStates.clear();
         this.deps.setWelcomeEl(renderer.renderMessages(visible, () => this.getGreeting()));
         this.updateWelcomeVisibility();
         try { await this.save(); }
@@ -613,6 +623,9 @@ export class ConversationController {
    * only metadata is saved - the SDK handles message persistence.
    */
   async save(updateLastActivity = false, options?: SaveOptions): Promise<void> {
+    // Every save persists the whole current state, including any coalesced progress.
+    this.pendingProgressSave?.supersede();
+    this.pendingProgressSave = null;
     if (this.deps.isConversationHydrated?.() === false) return;
     const { plugin, state } = this.deps;
 
@@ -663,6 +676,31 @@ export class ConversationController {
   }
 
   /**
+   * Coalesces display-only progress into one trailing save. The next direct save of any kind,
+   * including close, teardown, and navigation saves, supersedes it without another write.
+   * `persist` runs the save from its owner's queue; only the scheduling call receives the promise.
+   */
+  scheduleProgressSave(persist: () => Promise<void> | null | undefined): Promise<void> | undefined {
+    if (this.pendingProgressSave) return undefined;
+    let pending!: { supersede: () => void };
+    const due = new Promise<boolean>((resolve) => {
+      const timer = window.setTimeout(() => resolve(true), PROGRESS_SAVE_DELAY_MS);
+      pending = {
+        supersede: () => {
+          window.clearTimeout(timer);
+          resolve(false);
+        },
+      };
+    });
+    this.pendingProgressSave = pending;
+    return due.then(async (isDue) => {
+      if (!isDue) return;
+      if (this.pendingProgressSave === pending) this.pendingProgressSave = null;
+      await persist();
+    });
+  }
+
+  /**
    * Shared logic for restoring a conversation into the current tab.
    * Used by both loadActive() and switchTo() to avoid duplication.
    */
@@ -678,6 +716,7 @@ export class ConversationController {
 
     this.deps.getLinkedContentController().lock(conversation.linkedContentPath);
 
+    this.deps.state.writeEditStates.clear();
     const welcomeEl = renderer.renderMessages(
       state.messages,
       () => this.getGreeting()
