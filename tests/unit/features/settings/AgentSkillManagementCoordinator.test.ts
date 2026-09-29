@@ -1,6 +1,16 @@
+import { chmod } from 'node:fs/promises';
+
+import { DesktopVault } from '@test/helpers/core/DesktopVault';
+
 import type { AgentSkillDocument, AgentSkillInput } from '@/core/skills/AgentSkill';
 import type { AgentSkillRepository } from '@/core/skills/AgentSkillRepository';
-import { AgentSkillRevisionConflictError } from '@/core/skills/AgentSkillRepository';
+import {
+  AgentSkillRepository as VaultAgentSkillRepository,
+  AgentSkillRevisionConflictError,
+  CLAUDE_COMMANDS_ROOT,
+  CLAUDE_SKILLS_ROOT,
+} from '@/core/skills/AgentSkillRepository';
+import { ClaudeCommandRepository, ClaudeCommandRevisionConflictError } from '@/core/skills/ClaudeCommandRepository';
 import { AgentSkillManagementCoordinator } from '@/features/settings/AgentSkillManagementCoordinator';
 
 function makeSkill(name = 'shared-skill', revision = 'revision-1'): AgentSkillDocument {
@@ -26,17 +36,13 @@ function createRepository() {
 }
 
 describe('AgentSkillManagementCoordinator', () => {
-  it('uses one repository and refreshes every mounted panel after persistence', async () => {
+  it('persists once and then invalidates provider skill resources', async () => {
     const repository = createRepository();
     const notifyAgentSkillsChanged = jest.fn().mockResolvedValue(undefined);
     const coordinator = new AgentSkillManagementCoordinator(
       repository,
       notifyAgentSkillsChanged,
     );
-    const refreshA = jest.fn().mockResolvedValue(undefined);
-    const refreshB = jest.fn().mockResolvedValue(undefined);
-    coordinator.subscribe(refreshA);
-    coordinator.subscribe(refreshB);
 
     const input: AgentSkillInput = {
       name: 'shared-skill',
@@ -47,65 +53,27 @@ describe('AgentSkillManagementCoordinator', () => {
 
     expect(repository.create).toHaveBeenCalledWith(input);
     expect(notifyAgentSkillsChanged).toHaveBeenCalledTimes(1);
-    expect(refreshA).toHaveBeenCalledTimes(1);
-    expect(refreshB).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ value: makeSkill(), refreshFailed: false });
   });
 
-  it('refreshes panels independently when provider invalidation fails', async () => {
+  it('reports a failed provider invalidation without failing the mutation', async () => {
     const repository = createRepository();
     const coordinator = new AgentSkillManagementCoordinator(
       repository,
       jest.fn().mockRejectedValue(new Error('provider refresh unavailable')),
     );
-    const refresh = jest.fn().mockResolvedValue(undefined);
-    coordinator.subscribe(refresh);
 
     const result = await coordinator.trash('shared-skill', 'revision-1');
 
     expect(repository.trash).toHaveBeenCalledWith('shared-skill', 'revision-1');
-    expect(refresh).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ value: undefined, refreshFailed: true });
   });
 
-  it('removes individual subscribers and resets all subscriptions on rebuild', async () => {
-    const coordinator = new AgentSkillManagementCoordinator(
-      createRepository(),
-      jest.fn().mockResolvedValue(undefined),
-    );
-    const refreshA = jest.fn().mockResolvedValue(undefined);
-    const refreshB = jest.fn().mockResolvedValue(undefined);
-    const unsubscribeA = coordinator.subscribe(refreshA);
-    coordinator.subscribe(refreshB);
-
-    unsubscribeA();
-    await coordinator.create({
-      name: 'shared-skill',
-      description: 'Shared description',
-      instructions: 'Shared instructions',
-    });
-
-    expect(refreshA).not.toHaveBeenCalled();
-    expect(refreshB).toHaveBeenCalledTimes(1);
-
-    coordinator.resetSubscriptions();
-    await coordinator.create({
-      name: 'shared-skill',
-      description: 'Shared description',
-      instructions: 'Shared instructions',
-    });
-
-    expect(refreshA).not.toHaveBeenCalled();
-    expect(refreshB).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not publish or refresh when persistence fails', async () => {
+  it('does not invalidate providers when persistence fails', async () => {
     const repository = createRepository();
     repository.update.mockRejectedValue(new Error('stale revision'));
     const notify = jest.fn().mockResolvedValue(undefined);
-    const refresh = jest.fn().mockResolvedValue(undefined);
     const coordinator = new AgentSkillManagementCoordinator(repository, notify);
-    coordinator.subscribe(refresh);
 
     await expect(coordinator.update('shared-skill', 'stale', {
       name: 'shared-skill',
@@ -114,7 +82,6 @@ describe('AgentSkillManagementCoordinator', () => {
     })).rejects.toThrow('stale revision');
 
     expect(notify).not.toHaveBeenCalled();
-    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('propagates one success and one revision conflict from two mounted panels', async () => {
@@ -142,5 +109,65 @@ describe('AgentSkillManagementCoordinator', () => {
       status: 'rejected',
       reason: expect.any(AgentSkillRevisionConflictError),
     }));
+  });
+
+  describe('converting a command on a filesystem-backed vault', () => {
+    let vault: DesktopVault;
+    let commands: ClaudeCommandRepository;
+    let coordinator: AgentSkillManagementCoordinator;
+    const input: AgentSkillInput = { name: 'deploy', description: 'Deploy', instructions: 'Deploy it' };
+
+    beforeEach(async () => {
+      vault = await DesktopVault.create();
+      await vault.write(`${CLAUDE_COMMANDS_ROOT}/deploy.md`, '---\ndescription: Deploy\n---\nDeploy it\n');
+      commands = new ClaudeCommandRepository(vault.files);
+      coordinator = new AgentSkillManagementCoordinator(
+        new VaultAgentSkillRepository(vault.files, { root: CLAUDE_SKILLS_ROOT, readPolicy: 'lenient' }),
+        jest.fn(),
+        commands,
+      );
+    });
+
+    afterEach(async () => {
+      await vault.dispose();
+    });
+
+    it('creates nothing when the command changed after the draft was opened', async () => {
+      const [command] = (await commands.list()).commands;
+      await vault.write(`${CLAUDE_COMMANDS_ROOT}/deploy.md`, '---\ndescription: Deploy\n---\nEdited elsewhere\n');
+
+      await expect(coordinator.convertCommand(command, input)).rejects.toBeInstanceOf(ClaudeCommandRevisionConflictError);
+
+      expect(await vault.exists(`${CLAUDE_SKILLS_ROOT}/deploy`)).toBe(false);
+      expect(await vault.read(`${CLAUDE_COMMANDS_ROOT}/deploy.md`)).toContain('Edited elsewhere');
+      const [fresh] = (await commands.list()).commands;
+      await expect(coordinator.convertCommand(fresh, input)).resolves.toBeTruthy();
+      expect(await vault.exists(`${CLAUDE_COMMANDS_ROOT}/deploy.md`)).toBe(false);
+    });
+
+    it('keeps the new skill when the command is trashed but its emptied folder cannot be removed', async () => {
+      await vault.write(`${CLAUDE_COMMANDS_ROOT}/ops/ship.md`, '---\ndescription: Ship\n---\nShip it\n');
+      const command = (await commands.list()).commands.find(entry => entry.name === 'ops/ship')!;
+      // A read-only parent refuses removal of the emptied `ops` folder, not the trash of the file.
+      await chmod(vault.resolve(CLAUDE_COMMANDS_ROOT), 0o555);
+      try {
+        await expect(coordinator.convertCommand(command, { ...input, name: 'ops-ship' })).resolves.toBeTruthy();
+      } finally {
+        await chmod(vault.resolve(CLAUDE_COMMANDS_ROOT), 0o755);
+      }
+
+      expect(await vault.exists(`${CLAUDE_SKILLS_ROOT}/ops-ship/SKILL.md`)).toBe(true);
+      expect(await vault.exists(`${CLAUDE_COMMANDS_ROOT}/ops/ship.md`)).toBe(false);
+    });
+
+    it('removes the new skill when the command cannot be removed', async () => {
+      const [command] = (await commands.list()).commands;
+      jest.spyOn(commands, 'trash').mockRejectedValueOnce(new ClaudeCommandRevisionConflictError('deploy'));
+
+      await expect(coordinator.convertCommand(command, input)).rejects.toBeInstanceOf(ClaudeCommandRevisionConflictError);
+
+      expect(await vault.exists(`${CLAUDE_SKILLS_ROOT}/deploy`)).toBe(false);
+      expect(await vault.exists(`${CLAUDE_COMMANDS_ROOT}/deploy.md`)).toBe(true);
+    });
   });
 });
