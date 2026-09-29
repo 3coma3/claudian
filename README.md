@@ -185,14 +185,7 @@ Before opening a pull request, please read the [contribution guide](CONTRIBUTING
 
 <img src="https://gcdn.moonshot.cn/growth-cdn/sponsor/kimi-en.png" alt="Kimi (Moonshot AI)" width="90%">
 
-Thanks to Kimi (Moonshot AI), our Open Source Friend, for supporting Claudian! With 2.8T parameters, native vision, and a
-1-million-token context window, Kimi K3 delivers frontier performance across long-horizon coding, knowledge work, and
-reasoning.
-
-New users receive bonus API credits equal to 10% of their first successful top-up. Use the discount link for the
-[CN](https://platform.kimi.com?track_id=track-1f391886e67141d4866ff9d261767ee7&aff=claudian) or
-[Global](https://platform.kimi.ai?track_id=track-9800ef0cb7f444b1b33371617443c186&aff=claudian) platform. This offer
-ends September 30, 2026. Claudian receives no affiliate commission from these links.
+Thanks Kimi (Moonshot AI) for supporting Claudian! Try a **Kimi Code plan** ([CN](https://www.kimi.com/code?aff=claudian) | [Global](https://www.kimi.ai/code?aff=claudian)), or use the **API** through the Kimi Open Platform ([CN](https://platform.kimi.com?track_id=track-8415973bd2f5424dadf3cee1cdbacaca&aff=claudian) | [Global](https://platform.kimi.ai?track_id=track-39fcfe097e114d8b8ca8fbcd1abf7266&aff=claudian)). New users receive bonus API credits equal to 10% of their first successful top-up. This offer ends December 31, 2026. Claudian receives no affiliate commission from these links. Claudian receives no affiliate commission from these links.
 
 ### Ke Holdings Inc. (BEIKE)
 
