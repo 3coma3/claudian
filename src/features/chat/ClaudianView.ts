@@ -2178,6 +2178,8 @@ export class ClaudianView extends ItemView implements ZenModeSource {
         this.closeSessionSearch();
         return false;
       }
+      // Menus also consume Escape in the capture phase; this covers a keymap that sees it first.
+      if (activeTab?.ui.toolbarMenus.closeOpenMenu()) return false;
       if (!e.defaultPrevented && activeTab) {
         cancelSelectedDestinationTurn(activeTab);
       }

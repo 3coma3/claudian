@@ -571,8 +571,8 @@ describe('ClaudeSettingsTab', () => {
     expect(names).not.toContain('Default model');
     expect(names).not.toContain('settings.customModels.name');
     const headings = createdSettings.filter(setting => setting.heading).map(setting => setting.name);
-    expect(headings).toEqual(expect.arrayContaining(['settings.models', 'settings.safety']));
-    expect(headings.indexOf('settings.models')).toBeLessThan(headings.indexOf('settings.safety'));
+    expect(headings).toEqual(expect.arrayContaining(['settings.models', 'settings.claude.configuration']));
+    expect(headings.indexOf('settings.models')).toBeLessThan(headings.indexOf('settings.claude.configuration'));
     expect(mockRenderModelPicker).toHaveBeenCalledWith(
       container, 'claude', 'Claude Code', mockModelCatalog, expect.any(Function),
     );
@@ -637,26 +637,5 @@ describe('ClaudeSettingsTab', () => {
     }));
     environmentOptions.renderCustomContextLimits(target);
     expect(context.renderCustomContextLimits).toHaveBeenCalledWith(target, 'claude');
-  });
-
-  it('offers auto as a Claude safe mode and persists it', async () => {
-    const plugin = createPlugin();
-    const context = createContext(plugin);
-
-    createSettingsRenderer().render(createContainer(), context);
-
-    const safeModeSetting = findSetting('settings.claudeSafeMode.name');
-    const safeModeDropdown = safeModeSetting.dropdownComponents[0];
-
-    expect(safeModeDropdown.options).toEqual([
-      { value: 'acceptEdits', label: 'acceptEdits' },
-      { value: 'auto', label: 'auto' },
-      { value: 'default', label: 'default' },
-    ]);
-
-    await safeModeDropdown.onChangeCallback?.('auto');
-
-    expect(plugin.settings.providerConfigs.claude.safeMode).toBe('auto');
-    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
   });
 });

@@ -580,15 +580,12 @@ describe('CodexChatUIConfig', () => {
     });
   });
 
-  describe('getPermissionModeToggle', () => {
-    it('should return yolo/safe toggle config', () => {
-      const toggle = codexChatUIConfig.getPermissionModeToggle!();
-      expect(toggle).toEqual({
-        inactiveValue: 'normal',
-        inactiveLabel: 'Safe',
-        activeValue: 'yolo',
-        activeLabel: 'YOLO',
-      });
+  describe('getPermissionModeOptions', () => {
+    it('provides the three permission presets while retaining persisted mode values', () => {
+      const options = codexChatUIConfig.getPermissionModeOptions!()!;
+      expect(options.map(({ value, label }) => [value, label])).toEqual([
+        ['auto-review', 'Approve for me'], ['normal', 'Ask for approval'], ['yolo', 'Full access'],
+      ]);
     });
   });
 

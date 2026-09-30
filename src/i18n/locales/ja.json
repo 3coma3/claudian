@@ -160,10 +160,6 @@
       "name": "ユーザーの Claude Code 設定を読み込む",
       "desc": "~/.claude からユーザーレベルの Claude Code 設定（settings.json、スキル、コマンド、エージェント、プラグイン）を読み込みます。無効にすると、Vault レベルの設定のみ利用できます。有効にすると、ユーザーの許可ルールがセキュリティモードをバイパスする可能性があります。"
     },
-    "claudeSafeMode": {
-      "name": "セーフモード",
-      "desc": "Safe トグルが有効なときに使用する権限モードです。"
-    },
     "codexSafeMode": {
       "name": "セーフモード",
       "desc": "Safe トグルが有効なときに使用するサンドボックスモードです。"
@@ -324,6 +320,7 @@
       "stale": "{provider} のモデルカタログが古くなっています。「検出」をクリックして更新してください。"
     },
     "claude": {
+      "configuration": "構成",
       "responseStyle": {
         "name": "応答スタイル",
         "desc": "デフォルトは Claude Code の通常のスタイルです。簡潔モードは結果を先に示し、前置きを省きます。Claude Code 2.1.237 以降が必要です。",

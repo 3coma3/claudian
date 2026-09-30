@@ -160,10 +160,6 @@
       "name": "Charger les paramètres utilisateur de Claude Code",
       "desc": "Charge la configuration Claude Code au niveau utilisateur depuis ~/.claude : settings.json, skills, commandes, agents et plugins. Lorsque désactivé, seule la configuration au niveau du coffre est disponible. Lorsqu'activé, les règles de permission de l'utilisateur peuvent contourner le mode sécurisé."
     },
-    "claudeSafeMode": {
-      "name": "Mode sécurisé",
-      "desc": "Mode d'autorisation utilisé lorsque le bouton Safe est actif."
-    },
     "codexSafeMode": {
       "name": "Mode sécurisé",
       "desc": "Mode sandbox utilisé lorsque le bouton Safe est actif."
@@ -324,6 +320,7 @@
       "stale": "Le catalogue de modèles {provider} est obsolète. Cliquez sur Découvrir pour l'actualiser."
     },
     "claude": {
+      "configuration": "Configuration",
       "responseStyle": {
         "name": "Style de réponse",
         "desc": "Par défaut utilise le style habituel de Claude Code. Concis commence par les résultats et évite les préambules. Nécessite Claude Code 2.1.237 ou ultérieur.",

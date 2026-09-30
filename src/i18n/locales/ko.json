@@ -160,10 +160,6 @@
       "name": "사용자 Claude Code 설정 로드",
       "desc": "~/.claude에서 사용자 수준 Claude Code 구성(settings.json, 스킬, 명령, 에이전트, 플러그인)을 로드합니다. 비활성화하면 Vault 수준 구성만 사용할 수 있습니다. 활성화하면 사용자의 허용 규칙이 보안 모드를 우회할 수 있습니다."
     },
-    "claudeSafeMode": {
-      "name": "안전 모드",
-      "desc": "Safe 토글이 활성화되었을 때 사용하는 권한 모드입니다."
-    },
     "codexSafeMode": {
       "name": "안전 모드",
       "desc": "Safe 토글이 활성화되었을 때 사용하는 샌드박스 모드입니다."
@@ -324,6 +320,7 @@
       "stale": "{provider} 모델 카탈로그가 오래되었습니다. 검색을 클릭하여 새로 고치세요."
     },
     "claude": {
+      "configuration": "구성",
       "responseStyle": {
         "name": "응답 스타일",
         "desc": "기본은 Claude Code의 일반 스타일입니다. 간결 모드는 결과부터 제시하고 서두를 생략합니다. Claude Code 2.1.237 이상이 필요합니다.",

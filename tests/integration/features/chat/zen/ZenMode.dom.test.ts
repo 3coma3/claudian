@@ -495,12 +495,20 @@ it('moves the composer controls to their own row only once the typed text would 
   tab.dom.inputEl.value = '';
   await waitFor(() => expect(stacked()).toBe(false));
 
+  // Attachments take the controls' row with them, below the input.
+  tab.ui.contextTray.setItems('editor-selection', [{ id: 'selection', kind: 'selection', label: '3 lines selected' }]);
+  await waitFor(() => expect(stacked()).toBe(true));
+  tab.ui.contextTray.clearItems('editor-selection');
+  await waitFor(() => expect(stacked()).toBe(false));
+
   // Wider controls (a longer model label, fast mode appearing) also make room below.
   tab.dom.inputEl.value = 'Short question';
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
   expect(stacked()).toBe(false);
   toolbarWidth = 390;
-  toolbar.querySelector<HTMLElement>('.claudian-model-btn')!.append(' (long alias)');
+  // The chip's label is replaced the way ModelSelector.updateDisplay sets it.
+  const modelLabel = within(toolbar).getByRole('button', { name: /^Model:/ }).querySelector<HTMLElement>('.claudian-model-label')!;
+  modelLabel.setText(`${modelLabel.textContent} (long alias)`);
   await waitFor(() => expect(stacked()).toBe(true));
 });
 

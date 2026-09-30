@@ -52,7 +52,8 @@ export function restoreZenScrollIntent(
 /**
  * Compact presentation for one attached runtime: a state-driven activity line,
  * the moved transcript behind a disclosure, and the moved composer, which keeps
- * its own send and cancel keys and shows its model, effort, fast mode and context controls inline.
+ * its own send and cancel keys, shows its model, effort and fast mode controls inline,
+ * and keeps the context gauge in its info row below.
  * It holds presentation state only; chat owners keep drafts, queues and turns.
  */
 export class ZenModePanel {
