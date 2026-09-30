@@ -1,7 +1,11 @@
+import { createConversationPorts } from '@test/helpers/ConversationPorts';
 import { createMockEl } from '@test/helpers/MockElement';
 import { within } from '@testing-library/dom';
 import { JSDOM } from 'jsdom';
+import { Component } from 'obsidian';
 
+import { ProviderExecutionLifecycleRegistry } from '@/core/execution';
+import { RuntimeCommandCatalog } from '@/core/providers/commands/RuntimeCommandCatalog';
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import { ProviderWorkspaceRegistry } from '@/core/providers/ProviderWorkspaceRegistry';
 import { ConversationController } from '@/features/chat/controllers/ConversationController';
@@ -10,6 +14,7 @@ import type {
   ChatExecutionCoordinatorDeps,
   ChatExecutionEventContext,
 } from '@/features/chat/execution/ChatExecutionCoordinator';
+import { getTabProviderId } from '@/features/chat/tabs/providerResolution';
 import {
   destroyTab,
   drainTabForShutdownSnapshot,
@@ -34,6 +39,7 @@ const titleServiceInstances: Array<{ cancel: jest.Mock }> = [];
 let coordinatorDisposeError: Error | null = null;
 
 interface MockCoordinator {
+  getCommandSnapshot: jest.Mock;
   bindConversation: jest.Mock;
   cancel: jest.Mock;
   dispose: jest.Mock;
@@ -48,6 +54,7 @@ interface MockCoordinator {
 jest.mock('@/features/chat/execution/ChatExecutionCoordinator', () => ({
   ChatExecutionCoordinator: jest.fn().mockImplementation((deps) => {
     const coordinator: MockCoordinator = {
+      getCommandSnapshot: jest.fn().mockReturnValue(undefined),
       bindConversation: jest.fn().mockResolvedValue(undefined),
       cancel: jest.fn(),
       dispose: jest.fn().mockImplementation(() => coordinatorDisposeError
@@ -73,14 +80,12 @@ jest.mock('@/core/providers/ProviderWorkspaceRegistry', () => ({
     getCommandCatalog: jest.fn().mockReturnValue(null),
     getIfInitialized: jest.fn().mockReturnValue(null),
     getCommandLoader: jest.fn().mockReturnValue(null),
-    getTabWarmupPolicy: jest.fn().mockReturnValue(null),
   },
 }));
 
 jest.mock('@/core/providers/ProviderRegistry', () => ({
   ProviderRegistry: {
     createExecutionBackend: jest.fn(),
-    createInstructionRefineService: jest.fn().mockReturnValue(null),
     createSubagentHistoryService: jest.fn().mockReturnValue(null),
     createTitleGenerationService: jest.fn().mockImplementation(() => {
       const service = {
@@ -95,6 +100,7 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
       supportsFork: true,
       supportsImageAttachments: true,
     }),
+    getModelPolicy: (providerId: string) => ProviderRegistry.getChatUIConfig(providerId),
     getChatUIConfig: jest.fn().mockReturnValue({
       applyPermissionMode: (_mode: string, settings: Record<string, unknown>) => {
         settings.permissionMode = _mode;
@@ -115,9 +121,10 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
     getConversationHistoryService: jest.fn().mockReturnValue({
       resolveSessionIdForConversation: jest.fn().mockReturnValue(null),
     }),
-    getBlankTabProviderIds: jest.fn().mockReturnValue(['claude']),
+    getBlankTabProviderIds: jest.fn((settings: Record<string, unknown>) =>
+      ProviderRegistry.getEnabledProviderIds(settings)),
     getEnabledProviderIds: jest.fn().mockReturnValue(['claude']),
-    getRegisteredProviderIds: jest.fn().mockReturnValue(['claude']),
+    getRegisteredProviderIds: jest.fn().mockReturnValue(['claude', 'codex']),
     getProviderDisplayName: jest.fn().mockReturnValue('Claude'),
     getTaskResultInterpreter: jest.fn(),
     isEnabled: jest.fn().mockReturnValue(true),
@@ -128,9 +135,10 @@ jest.mock('@/core/providers/ProviderRegistry', () => ({
 
 jest.mock('@/core/providers/ProviderSettingsCoordinator', () => ({
   ProviderSettingsCoordinator: {
-    commitProviderSettingsSnapshot: (
+    commitProviderSettingsChange: (
       settings: Record<string, unknown>,
       _providerId: string,
+      _before: Record<string, unknown>,
       snapshot: Record<string, unknown>,
     ) => Object.assign(settings, snapshot),
     getProviderSettingsSnapshot: (settings: Record<string, unknown>) => ({
@@ -173,7 +181,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
       },
     },
     providerHost: {
-      executionLifecycleRegistry: {},
+      executionLifecycleRegistry: new ProviderExecutionLifecycleRegistry(),
     },
     chatModelSelection: {
       beginIntent: jest.fn(() => {
@@ -186,6 +194,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
       }),
     },
     settings,
+    getCommittedSettings: () => settings,
     getActiveEnvironmentVariables: jest.fn().mockReturnValue({}),
     mutateSettings: jest.fn(async (mutation) => {
       await mutation(settings);
@@ -193,6 +202,7 @@ function createPlugin(overrides: Record<string, unknown> = {}) {
     getConversationById: jest.fn().mockResolvedValue(null),
     getCachedConversation: jest.fn().mockReturnValue(null),
     getConversationList: jest.fn().mockReturnValue([]),
+    getConversationSummary(id: string) { return this.getConversationSync(id); },
     getConversationSync: jest.fn().mockReturnValue(null),
     findConversationAcrossViews: jest.fn().mockReturnValue(null),
     handleMissingProviderSession: jest.fn(),
@@ -206,20 +216,19 @@ function createTabManager(
   callbacks: Record<string, unknown> = {},
   viewOverrides: Record<string, unknown> = {},
 ) {
-  const view = {
-    addChild: jest.fn(),
+  const view = Object.assign(new Component(), {
     getTabManager: jest.fn(),
     leaf: {},
     registerDomEvent: jest.fn(),
     registerEvent: jest.fn(),
     ...viewOverrides,
-  } as any;
+  }) as any;
   return new TabManager(plugin, containerEl as any, view, callbacks);
 }
 
 function expectTabManagerMetadataReleased(manager: TabManager, tabId: string): void {
   const internals = manager as any;
-  expect(internals.providerRuntimeCommandWarmups.has(tabId)).toBe(false);
+  expect(internals.providerRuntimeCommandLoads.has(tabId)).toBe(false);
   expect(internals.providerRuntimeCommandCache.has(tabId)).toBe(false);
   expect(internals.providerCommandDiscoveryStores.has(tabId)).toBe(false);
   expect(internals.tabCommandContextRevisions.has(tabId)).toBe(false);
@@ -269,12 +278,11 @@ async function createTestTab(
     openConversation?: (conversationId: string) => Promise<void>;
   } = {},
 ): Promise<any> {
-  const component = {
-    addChild: jest.fn(),
+  const component = Object.assign(new Component(), {
     registerDomEvent: jest.fn(),
     registerEvent: jest.fn(),
     ...assembly.component,
-  } as any;
+  }) as any;
   const tab = await createTabRuntime({
     ...options,
     component,
@@ -323,23 +331,20 @@ function installTransitionController(
   plugin: ReturnType<typeof createPlugin>,
 ): ConversationController {
   const controller = new ConversationController({
+    ...createConversationPorts({ state: tab.state, getInputEl: () => tab.dom.inputEl, getImageContextManager: () => tab.ui.imageContextManager }),
     plugin,
     state: tab.state,
     renderer: tab.renderer!,
     subagentManager: tab.services.subagentManager,
-    getHistoryDropdown: () => null,
     getWelcomeEl: () => tab.dom.welcomeEl,
     setWelcomeEl: (element) => { tab.dom.welcomeEl = element; },
     getMessagesEl: () => tab.dom.messagesEl,
-    getInputEl: () => tab.dom.inputEl,
     getLinkedContentController: () => tab.ui.linkedContentController,
-    getImageContextManager: () => null,
     clearQueuedMessage: jest.fn(),
-    getTitleGenerationService: () => null,
     getExecutionCoordinator: () => tab.executionCoordinator,
     awaitBackgroundWork: () => tab.session.awaitBackgroundWork(),
     ensureExecutionForConversation: async (conversation) => {
-      tab.conversationId = conversation?.id ?? null;
+      tab.session.setConversationId(conversation?.id ?? null);
       await tab.executionCoordinator?.bindConversation(conversation
         ? {
           conversationId: conversation.id,
@@ -385,14 +390,43 @@ describe('Tab provider execution ownership', () => {
     globalThis.ResizeObserver = originalResizeObserver;
   });
 
-  it('creates exactly one tab-owned execution coordinator', async () => {
-    const tab = await createTestTab({
-      plugin: createPlugin(),
-      containerEl: createMockEl() as any,
+  it('refreshes cached picker entries when the owning session publishes command changes', async () => {
+    const getCatalog = jest.mocked(ProviderWorkspaceRegistry.getCommandCatalog);
+    const getCapabilities = jest.mocked(ProviderRegistry.getCapabilities);
+    const previousCapabilities = getCapabilities('claude');
+    const catalog = new RuntimeCommandCatalog({
+      dropdownConfig: { providerId: 'claude', triggerChars: ['/'], builtInPrefix: '/', skillPrefix: '/', commandPrefix: '/' },
+      projectEntry: command => ({
+        ...command, providerId: 'claude', kind: 'command', scope: 'runtime', source: 'sdk',
+        isEditable: false, isDeletable: false, displayPrefix: '/', insertPrefix: '/',
+      }),
     });
-
-    expect(tab.executionCoordinator).toBe(coordinatorInstances[0]);
-    expect(coordinatorInstances).toHaveLength(1);
+    getCatalog.mockReturnValue(catalog);
+    getCapabilities.mockReturnValue({ ...previousCapabilities, supportsProviderCommands: true });
+    const manager = createTabManager(createPlugin());
+    try {
+      const tab = await manager.createTab();
+      coordinatorInstances[0].getCommandSnapshot.mockReturnValue([
+        { id: 'before', name: 'before', description: '', content: '' },
+      ]);
+      const discovery = tab!.providerCatalogResolver!()!.discovery;
+      expect(await discovery.load()).toMatchObject({ status: 'ready', items: [{ name: 'before' }] });
+      coordinatorInstances[0].getCommandSnapshot.mockReturnValue([
+        { id: 'after', name: 'after', description: '', content: '' },
+      ]);
+      await coordinatorDeps[0].onSessionEvent?.({
+        type: 'commands_changed',
+        scope: { kind: 'session', sessionInstanceId: 'session-instance-1', sequence: 1 },
+      }, createEventContext());
+      expect(await discovery.load()).toMatchObject({ status: 'ready', items: [{ name: 'after' }] });
+      coordinatorInstances[0].getCommandSnapshot.mockReturnValue(undefined);
+      coordinatorDeps[0].warmExecution?.onWarmStateChanged?.(false);
+      expect(await discovery.load()).toEqual({ status: 'empty' });
+    } finally {
+      await manager.destroy();
+      getCatalog.mockReturnValue(null);
+      getCapabilities.mockReturnValue(previousCapabilities);
+    }
   });
 
   it('publishes work changes from turn, provider-background, and async-subagent owners', async () => {
@@ -403,8 +437,7 @@ describe('Tab provider execution ownership', () => {
       onWorkChanged,
     });
 
-    tab.session.activeTurn = Promise.resolve();
-    tab.session.activeTurn = null;
+    await tab.session.turns.run(async () => undefined);
     coordinatorDeps[0].onBackgroundWorkChanged?.(true);
     tab.services.subagentManager.refreshAsyncSubagent({
       asyncStatus: 'running',
@@ -419,6 +452,32 @@ describe('Tab provider execution ownership', () => {
 
     expect(onWorkChanged).toHaveBeenCalledTimes(4);
     expect(onWorkChanged).toHaveBeenCalledWith(tab);
+  });
+
+  it('blocks branch admission until the main turn has finished its finalization', async () => {
+    const tab = await createTestTab({ plugin: createPlugin(), containerEl: createMockEl() as any });
+    tab.state.currentConversationId = 'conversation';
+    tab.state.messages = [
+      { id: 'first', role: 'user', content: 'First', timestamp: Date.now(), userMessageId: 'native-first' },
+      { id: 'second', role: 'user', content: 'Second', timestamp: Date.now(), userMessageId: 'native-second' },
+    ];
+    const render = jest.spyOn(tab.renderer, 'renderMessages').mockReturnValue(null);
+    const refresh = jest.spyOn(tab.renderer, 'refreshBranchButtonState');
+    await tab.session.turns.run(async () => {
+      expect(tab.state.isStreaming).toBe(false);
+      await tab.controllers.conversationController.navigateBranch('second');
+      expect(tab.dom.inputEl.value).toBe('');
+      expect(render).not.toHaveBeenCalled();
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    tab.session.pauseIntentAdmission();
+    await tab.controllers.conversationController.navigateBranch('second');
+    expect(tab.dom.inputEl.value).toBe('');
+    await expect(tab.session.turns.run(async () => undefined)).rejects.toThrow('admission is closed');
+    tab.session.resumeIntentAdmission();
+    await tab.controllers.conversationController.navigateBranch('second');
+    expect(tab.dom.inputEl.value).toBe('Second');
+    expect(render).toHaveBeenCalledTimes(1);
   });
 
   it('leaves Enter on a composer link available for native link activation', async () => {
@@ -764,8 +823,8 @@ describe('Tab provider execution ownership', () => {
     expect(constructionContext).not.toHaveProperty('session');
     expect(constructionContext).not.toHaveProperty('state');
 
-    tab.draftModel = 'claude-alternate';
-    tab.lifecycleState = 'warm';
+    tab.session.selectDraft(tab.providerId, 'claude-alternate');
+    tab.session.setExecutionWarm(true);
     tab.providerCatalogResolver();
 
     const currentContext = getProviderCatalogConfig.mock.lastCall?.[0] as Record<
@@ -778,11 +837,6 @@ describe('Tab provider execution ownership', () => {
   });
 
   it('publishes only a structurally ready runtime from TabManager', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const plugin = createPlugin();
     const onTabCreated = jest.fn();
     const manager = createTabManager(plugin, createMockEl(), { onTabCreated });
@@ -792,6 +846,8 @@ describe('Tab provider execution ownership', () => {
 
       expect(tab).not.toBeNull();
       expect(tab?.executionCoordinator).not.toBeNull();
+      expect(tab!.executionCoordinator).toBe(coordinatorInstances[0]);
+      expect(coordinatorInstances).toHaveLength(1);
       expect(tab?.renderer).not.toBeNull();
       expect(Object.values(tab?.controllers ?? {})).not.toContain(null);
       expect(tab?.services.titleGenerationService).not.toBeNull();
@@ -805,7 +861,6 @@ describe('Tab provider execution ownership', () => {
       expect(tab?.ui.permissionToggle).not.toBeNull();
       expect(tab?.ui.serviceTierToggle).not.toBeNull();
       expect(tab?.ui.composerDropdown).not.toBeNull();
-      expect(tab?.ui.instructionModeManager).not.toBeNull();
       expect(tab?.ui.contextUsageMeter).not.toBeNull();
       const contentChildren = Array.from(tab!.dom.contentEl.children);
       const messagesIndex = contentChildren.indexOf(tab!.dom.messagesWrapperEl);
@@ -816,20 +871,14 @@ describe('Tab provider execution ownership', () => {
       expect(coordinatorInstances[0].prepare).not.toHaveBeenCalled();
     } finally {
       await manager.destroy();
-      globalThis.ResizeObserver = originalResizeObserver;
     }
   });
 
   it('hydrates a restored ready runtime without preparing provider execution', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const conversation = createConversation();
     const plugin = createPlugin({
       getCachedConversation: jest.fn().mockReturnValue(conversation),
-      getConversationSync: jest.fn().mockReturnValue(conversation),
+    getConversationSync: jest.fn().mockReturnValue(conversation),
       switchConversation: jest.fn().mockResolvedValue(conversation),
       updateConversation: jest.fn().mockResolvedValue(undefined),
     });
@@ -854,7 +903,6 @@ describe('Tab provider execution ownership', () => {
       expect(coordinatorInstances[0].prepare).not.toHaveBeenCalled();
     } finally {
       await manager.destroy();
-      globalThis.ResizeObserver = originalResizeObserver;
     }
   });
 
@@ -1022,6 +1070,124 @@ describe('Tab provider execution ownership', () => {
     expect(next.providerId).toBe('claude');
   });
 
+  it('keeps an explicit blank-tab selection through loading and changed catalog publications', async () => {
+    const plugin = createPlugin();
+    const uiConfig = ProviderRegistry.getChatUIConfig('claude');
+    plugin.settings.lastSelectedChatModel = { providerId: 'claude', model: 'claude-default' };
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
+    (uiConfig.getModelOptions as jest.Mock).mockReturnValue([]);
+    onProviderAvailabilityChanged(tab, plugin);
+    expect(tab.draftModel).toBe('claude-default');
+    expect(tab.providerId).toBe('claude');
+    (uiConfig.getModelOptions as jest.Mock).mockReturnValue([{ value: 'claude-alternate', label: 'Alternate' }]);
+    (uiConfig.getDefaultModel as jest.Mock).mockReturnValue('claude-alternate');
+    onProviderAvailabilityChanged(tab, plugin);
+    expect(tab.draftModel).toBe('claude-default');
+  });
+
+  it('preserves an unavailable last-selected model when creating a blank tab and publishing availability', async () => {
+    const plugin = createPlugin();
+    plugin.settings.lastSelectedChatModel = { providerId: 'claude', model: 'retired' };
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
+    onProviderAvailabilityChanged(tab, plugin);
+    expect(tab.providerId).toBe('claude');
+    expect(tab.draftModel).toBe('retired');
+  });
+
+  it('assembles only the active restored tab and preserves inactive identities without resources', async () => {
+    const plugin = createPlugin();
+    const root = createMockEl();
+    const manager = createTabManager(plugin, root);
+    const saved = {
+      openTabs: Array.from({ length: 20 }, (_, index) => ({ tabId: `saved-${index}`, conversationId: null, draftModel: 'claude-default' })),
+      activeTabId: 'saved-0',
+    };
+    try {
+      await manager.restoreState(saved);
+      expect(manager.getTabCount()).toBe(20);
+      expect(manager.getAllTabs()).toHaveLength(1);
+      expect(root.querySelectorAll('.claudian-tab-content')).toHaveLength(1);
+      expect(coordinatorInstances).toHaveLength(1);
+      expect(titleServiceInstances).toHaveLength(1);
+      expect(manager.getPersistedState().openTabs.map(tab => tab.tabId)).toEqual(saved.openTabs.map(tab => tab.tabId));
+      await manager.closeTab('saved-19');
+      expect(coordinatorInstances).toHaveLength(1);
+      plugin.settings.lastSelectedChatModel = { model: 'changed-model', providerId: 'codex' };
+      await manager.switchToTab('saved-1');
+      expect(manager.getActiveTab()?.draftModel).toBe('claude-default');
+      expect(coordinatorInstances).toHaveLength(2);
+      expect(root.querySelectorAll('.claudian-tab-content')).toHaveLength(2);
+    } finally { await manager.destroy(); }
+    expect(coordinatorInstances.every(coordinator => coordinator.dispose.mock.calls.length === 1)).toBe(true);
+  });
+
+  it('restores a draft on its recorded provider even when model ownership is unresolved', async () => {
+    const plugin = createPlugin();
+    (ProviderRegistry.resolveProviderForModel as jest.Mock).mockReturnValue(null);
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any,
+      draftModel: 'retired-endpoint', providerId: 'codex',
+    });
+    expect(tab.providerId).toBe('codex');
+    expect(tab.draftModel).toBe('retired-endpoint');
+  });
+
+  it('restores an ownerless legacy draft as a blocked tab', async () => {
+    const plugin = createPlugin();
+    (ProviderRegistry.resolveProviderForModel as jest.Mock).mockReturnValue(null);
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any, draftModel: 'retired-endpoint' });
+    expect(tab.providerId).toBeNull();
+    expect(tab.draftModel).toBe('retired-endpoint');
+    await expect(initializeTabExecution(tab, plugin)).rejects.toThrow(/select.*model/i);
+  });
+
+  it('persists and reopens an unresolved draft without starting provider services', async () => {
+    const plugin = createPlugin();
+    (ProviderRegistry.resolveProviderForModel as jest.Mock).mockReturnValue(null);
+    plugin.app.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+    const manager = createTabManager(plugin, createMockEl() as any);
+    await manager.restoreState({
+      openTabs: [{ tabId: 'blocked', conversationId: null, draftModel: 'retired-endpoint' }],
+      activeTabId: 'blocked',
+    });
+    const tab = manager.getActiveTab()!;
+    expect(tab.providerId).toBeNull();
+    expect(await manager.getSdkCommands(tab.id)).toEqual([]);
+    expect(ensureInitialized).not.toHaveBeenCalled();
+    const saved = manager.getPersistedState();
+    expect(saved.openTabs).toEqual([{
+      tabId: 'blocked', conversationId: null, draftModel: 'retired-endpoint', providerId: null,
+    }]);
+    await manager.destroy();
+    (ProviderRegistry.resolveProviderForModel as jest.Mock).mockReturnValue('claude');
+    const reopened = createTabManager(plugin, createMockEl() as any);
+    await reopened.restoreState(saved);
+    expect(reopened.getActiveTab()?.providerId).toBeNull();
+    expect(ensureInitialized).not.toHaveBeenCalled();
+    const active = reopened.getActiveTab()!;
+    const option = Array.from(active.dom.inputWrapper.querySelectorAll('.claudian-model-option'))
+      .find(el => Array.from(el.children).some(child => child.textContent === 'Claude Default')) as HTMLElement;
+    expect(option).toBeDefined();
+    option.click();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(active.providerId).toBe('claude');
+    expect(active.draftModel).toBe('claude-default');
+    expect(ensureInitialized).toHaveBeenCalled();
+    await reopened.destroy();
+  });
+
+  it('keeps a legacy Codex draft on its recorded provider when that provider is disabled', async () => {
+    const plugin = createPlugin();
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
+    tab.session.selectDraft('codex', tab.draftModel);
+    tab.session.selectDraft(tab.providerId, 'gpt-5.4');
+    (ProviderRegistry.getEnabledProviderIds as jest.Mock).mockReturnValue(['claude']);
+    (ProviderRegistry.resolveProviderForModel as jest.Mock).mockReturnValue('claude');
+    onProviderAvailabilityChanged(tab, plugin);
+    expect(getTabProviderId(tab, plugin)).toBe('codex');
+    expect(tab.providerId).toBe('codex');
+    expect(tab.draftModel).toBe('gpt-5.4');
+  });
+
   it('adopts a provider default when a model-less blank tab gains available options', async () => {
     const plugin = createPlugin();
     const uiConfig = ProviderRegistry.getChatUIConfig('claude');
@@ -1042,11 +1208,6 @@ describe('Tab provider execution ownership', () => {
   });
 
   it('records an explicit blank-tab model choice as the future-tab seed', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const plugin = createPlugin();
     const onDraftModelChanged = jest.fn();
     const tab = await createTestTab({
@@ -1072,7 +1233,6 @@ describe('Tab provider execution ownership', () => {
       model: 'claude-alternate',
     });
     expect(onDraftModelChanged).toHaveBeenCalledWith(tab, 'claude-alternate');
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('does not seed a model choice whose tab closes during provider initialization', async () => {
@@ -1116,7 +1276,7 @@ describe('Tab provider execution ownership', () => {
         attempt += 1) {
         await Promise.resolve();
       }
-      tab.lifecycleState = 'closing';
+      tab.session.beginClose();
       initialization.resolve(undefined);
       await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -1128,12 +1288,10 @@ describe('Tab provider execution ownership', () => {
     }
   });
 
-  it('does not rebuild provider services when failed selection settles after teardown', async () => {
+  it('does not restore provider selection when failed selection settles after teardown', async () => {
     const getChatUIConfig = ProviderRegistry.getChatUIConfig as jest.Mock;
     const getEnabledProviderIds = ProviderRegistry.getEnabledProviderIds as jest.Mock;
     const resolveProviderForModel = ProviderRegistry.resolveProviderForModel as jest.Mock;
-    const createInstructionRefineService = ProviderRegistry
-      .createInstructionRefineService as jest.Mock;
     const getIfInitialized = ProviderWorkspaceRegistry.getIfInitialized as jest.Mock;
     const claudeConfig = getChatUIConfig('claude');
     const codexConfig = {
@@ -1150,10 +1308,6 @@ describe('Tab provider execution ownership', () => {
       model.startsWith('codex-') ? 'codex' : 'claude'
     ));
     getIfInitialized.mockReturnValue({});
-    createInstructionRefineService.mockImplementation(() => ({
-      cancel: jest.fn(),
-      resetConversation: jest.fn(),
-    }));
     const initialization = deferred<void>();
     const onProviderChanged = jest.fn(() => initialization.promise);
 
@@ -1178,15 +1332,13 @@ describe('Tab provider execution ownership', () => {
         await Promise.resolve();
       }
       await destroyTab(tab);
-      const serviceCreationsAtTeardown = createInstructionRefineService.mock.calls.length;
+      expect(tab.providerId).toBe('codex');
       initialization.reject(new Error('Codex initialization failed'));
       await new Promise<void>(resolve => setImmediate(resolve));
 
-      expect(createInstructionRefineService).toHaveBeenCalledTimes(
-        serviceCreationsAtTeardown,
-      );
+      expect(tab.providerId).toBe('codex');
+      expect(plugin.settings.lastSelectedChatModel).toBeUndefined();
     } finally {
-      createInstructionRefineService.mockReturnValue(null);
       getIfInitialized.mockReturnValue(null);
       getChatUIConfig.mockReturnValue(claudeConfig);
       getEnabledProviderIds.mockReturnValue(['claude']);
@@ -1223,7 +1375,7 @@ describe('Tab provider execution ownership', () => {
       attempt += 1) {
       await Promise.resolve();
     }
-    tab.lifecycleState = 'closing';
+    tab.session.beginClose();
     commitGate.resolve(undefined);
     await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -1231,11 +1383,6 @@ describe('Tab provider execution ownership', () => {
   });
 
   it('does not seed an uninitialized provider after overlapping same-provider choices fail', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const getChatUIConfig = ProviderRegistry.getChatUIConfig as jest.Mock;
     const getEnabledProviderIds = ProviderRegistry.getEnabledProviderIds as jest.Mock;
     const resolveProviderForModel = ProviderRegistry.resolveProviderForModel as jest.Mock;
@@ -1293,16 +1440,10 @@ describe('Tab provider execution ownership', () => {
       getChatUIConfig.mockReturnValue(claudeConfig);
       getEnabledProviderIds.mockReturnValue(['claude']);
       resolveProviderForModel.mockReturnValue('claude');
-      globalThis.ResizeObserver = originalResizeObserver;
     }
   });
 
   it('records an explicit bound-conversation model choice without changing its provider', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const conversation = createConversation();
     const plugin = createPlugin({
       updateConversation: jest.fn().mockResolvedValue(undefined),
@@ -1332,7 +1473,6 @@ describe('Tab provider execution ownership', () => {
       model: 'claude-alternate',
     });
     expect(tab.providerId).toBe('claude');
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('does not seed a bound model choice after its commit loses runtime ownership', async () => {
@@ -1371,7 +1511,7 @@ describe('Tab provider execution ownership', () => {
       attempt += 1) {
       await Promise.resolve();
     }
-    tab.lifecycleState = 'closing';
+    tab.session.beginClose();
     commitGate.resolve(undefined);
     await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -1404,7 +1544,7 @@ describe('Tab provider execution ownership', () => {
       attempt += 1) {
       await Promise.resolve();
     }
-    tab.conversationId = 'conversation-2';
+    tab.session.setConversationId('conversation-2');
     persistence.resolve(undefined);
     await new Promise<void>(resolve => setImmediate(resolve));
 
@@ -1485,7 +1625,7 @@ describe('Tab provider execution ownership', () => {
       containerEl: createMockEl() as any,
       conversation: createConversation(),
     }, { component: { handleNewConversationCommand } });
-    tab.lifecycleState = 'closing';
+    tab.session.beginClose();
     tab.dom.inputEl.value = '/clear';
 
     await tab.controllers.inputController.sendMessage();
@@ -1521,33 +1661,16 @@ describe('Tab provider execution ownership', () => {
       scrollHeight: { configurable: true, get: readScrollHeight },
     });
 
-    tab.dom.inputEl.value = 'A responsive draft';
-    (tab.dom.inputEl as any).dispatchEvent('input');
-
-    expect(tab.session.userOwnershipRevision).toBe(1);
-    expect(readOffsetHeight).not.toHaveBeenCalled();
-    expect(readScrollHeight).not.toHaveBeenCalled();
-  });
-
-  it('records user ownership when a retained cold tab is edited', async () => {
-    const tab = await createTestTab({
-      plugin: createPlugin(),
-      containerEl: createMockEl() as any,
-    });
-
     tab.dom.inputEl.value = 'Keep this runtime';
     (tab.dom.inputEl as any).dispatchEvent('input');
 
     expect(tab.lifecycleState).toBe('cold');
     expect(tab.session.userOwnershipRevision).toBe(1);
+    expect(readOffsetHeight).not.toHaveBeenCalled();
+    expect(readScrollHeight).not.toHaveBeenCalled();
   });
 
   it('commits a provisional preview to cold state when the user attaches an image', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const plugin = createPlugin();
     const tab = await createTestTab({
       plugin,
@@ -1563,15 +1686,9 @@ describe('Tab provider execution ownership', () => {
 
     expect(attached).toBe(true);
     expect(tab.lifecycleState).toBe('cold');
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('commits a provisional preview when the user removes captured editor context', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const plugin = createPlugin();
     const tab = await createTestTab({
       plugin,
@@ -1592,18 +1709,12 @@ describe('Tab provider execution ownership', () => {
     removeButton.dispatchEvent('click');
 
     expect(tab.lifecycleState).toBe('cold');
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('keeps a browsed conversation provisional after hydration', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const conversation = createConversation();
     const plugin = createPlugin({
-      getConversationSync: jest.fn().mockReturnValue(conversation),
+    getConversationSync: jest.fn().mockReturnValue(conversation),
       switchConversation: jest.fn().mockResolvedValue(conversation),
       updateConversation: jest.fn().mockResolvedValue(undefined),
     });
@@ -1616,15 +1727,9 @@ describe('Tab provider execution ownership', () => {
     await tab.controllers.conversationController!.switchTo(conversation.id);
 
     expect(tab.lifecycleState).toBe('provisional');
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('activates conversation-owned input after the real tab switch callback settles', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const oldConversation = createConversation();
     const nextConversation = {
       ...createConversation(),
@@ -1632,7 +1737,7 @@ describe('Tab provider execution ownership', () => {
       sessionId: 'native-session-2',
     };
     const plugin = createPlugin({
-      getConversationSync: jest.fn((id) => (
+    getConversationSync: jest.fn((id) => (
         id === oldConversation.id ? oldConversation : nextConversation
       )),
       switchConversation: jest.fn().mockResolvedValue(nextConversation),
@@ -1655,7 +1760,6 @@ describe('Tab provider execution ownership', () => {
 
     expect(onConversationActivated).toHaveBeenCalledTimes(1);
     expect(tab.state.currentConversationId).toBe(nextConversation.id);
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('invalidates command context before publishing a conversation rebind', async () => {
@@ -1667,7 +1771,7 @@ describe('Tab provider execution ownership', () => {
     };
     const onCommandContextChanged = jest.fn();
     const plugin = createPlugin({
-      getConversationSync: jest.fn().mockReturnValue(oldConversation),
+    getConversationSync: jest.fn().mockReturnValue(oldConversation),
       switchConversation: jest.fn().mockResolvedValue(nextConversation),
       updateConversation: jest.fn().mockResolvedValue(undefined),
     });
@@ -1708,35 +1812,6 @@ describe('Tab provider execution ownership', () => {
     expect(handleExecutionEvent).toHaveBeenCalledWith(event);
   });
 
-  it('routes provider interactions through the current input controller', async () => {
-    const plugin = createPlugin();
-    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
-    const handleApprovalRequest = jest.fn().mockResolvedValue('allow');
-    tab.controllers.inputController = {
-      handleApprovalRequest,
-    } as any;
-
-    await expect(coordinatorDeps[0].interactionPort.requestApproval({
-      description: 'Read note',
-      input: { path: 'note.md' },
-      interactionId: 'interaction-1',
-      kind: 'approval',
-      sessionInstanceId: 'session-instance-1',
-      toolName: 'Read',
-      turnId: 'turn-1',
-    }, new AbortController().signal)).resolves.toEqual({
-      decision: 'allow',
-      interactionId: 'interaction-1',
-    });
-    expect(handleApprovalRequest).toHaveBeenCalledWith(
-      'Read',
-      { path: 'note.md' },
-      'Read note',
-      {},
-    );
-    expect(tab.state.attention).toBeNull();
-  });
-
   it('keeps provider interactions action-required until they settle', async () => {
     const plugin = createPlugin();
     const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
@@ -1748,7 +1823,7 @@ describe('Tab provider execution ownership', () => {
 
     const request = coordinatorDeps[0].interactionPort.requestApproval({
       description: 'Read note',
-      input: {},
+      input: { path: 'note.md' },
       interactionId: 'interaction-1',
       kind: 'approval',
       sessionInstanceId: 'session-instance-1',
@@ -1757,11 +1832,22 @@ describe('Tab provider execution ownership', () => {
     }, new AbortController().signal);
 
     await Promise.resolve();
+    expect(handleApprovalRequest).toHaveBeenCalledWith(
+      'interaction-1',
+      'Read',
+      { path: 'note.md' },
+      'Read note',
+      {},
+      expect.any(AbortSignal),
+    );
     expect(tab.state.requiresAction).toBe(true);
     expect(coordinatorDeps[0].warmExecution?.canCool()).toBe(false);
 
     resolveApproval('allow');
-    await request;
+    await expect(request).resolves.toEqual({
+      decision: 'allow',
+      interactionId: 'interaction-1',
+    });
 
     expect(tab.state.attention).toBeNull();
   });
@@ -1773,63 +1859,6 @@ describe('Tab provider execution ownership', () => {
     tab.state.markReviewRequired();
 
     expect(coordinatorDeps[0].warmExecution?.canCool()).toBe(true);
-  });
-
-  it('buffers normalized background output and persists it on completion', async () => {
-    const plugin = createPlugin();
-    const onReviewableSettlement = jest.fn();
-    const tab = await createTestTab({
-      plugin,
-      containerEl: createMockEl() as any,
-      captureReviewableSettlement: () => onReviewableSettlement,
-    });
-    Object.defineProperty(tab.dom.contentEl, 'isConnected', { value: true });
-    const assistantEl = createMockEl();
-    assistantEl.querySelector = jest.fn().mockReturnValue(createMockEl());
-    tab.renderer = {
-      addMessage: jest.fn().mockReturnValue(assistantEl),
-      finalizeResponse: jest.fn(),
-      scrollToBottom: jest.fn(),
-    } as any;
-    tab.controllers.streamController = {
-      appendText: jest.fn(),
-      finalizeCurrentTextBlock: jest.fn(),
-      finalizeCurrentThinkingBlock: jest.fn(),
-      handleStreamChunk: jest.fn(),
-      hideThinkingIndicator: jest.fn(),
-    } as any;
-    tab.controllers.conversationController = {
-      save: jest.fn().mockResolvedValue(undefined),
-    } as any;
-    const backgroundScope = {
-      kind: 'background' as const,
-      sequence: 1,
-      sessionInstanceId: 'session-instance-1',
-      turnId: 'background-turn-1',
-    };
-
-    const context = createEventContext();
-    await coordinatorDeps[0].onSessionEvent?.({
-      type: 'background_turn_started',
-      scope: backgroundScope,
-    }, context);
-    await coordinatorDeps[0].onSessionEvent?.({
-      type: 'text_delta',
-      text: 'background result',
-      scope: { ...backgroundScope, sequence: 2 },
-    }, context);
-    await coordinatorDeps[0].onSessionEvent?.({
-      type: 'background_turn_completed',
-      reason: 'completed',
-      scope: { ...backgroundScope, sequence: 3 },
-    }, context);
-
-    expect(tab.controllers.streamController!.handleStreamChunk).toHaveBeenCalledWith(
-      { content: 'background result', type: 'text' },
-      expect.objectContaining({ role: 'assistant' }),
-    );
-    expect(tab.controllers.conversationController!.save).toHaveBeenCalledWith(true);
-    expect(onReviewableSettlement).toHaveBeenCalledTimes(1);
   });
 
   it('captures background review activity before persistence completes', async () => {
@@ -1857,6 +1886,8 @@ describe('Tab provider execution ownership', () => {
       scrollToBottom: jest.fn(),
     } as any;
     tab.controllers.streamController = {
+      createBackgroundStream() { return this; },
+      dispose: jest.fn(),
       appendText: jest.fn(),
       finalizeCurrentTextBlock: jest.fn(),
       finalizeCurrentThinkingBlock: jest.fn(),
@@ -1892,6 +1923,10 @@ describe('Tab provider execution ownership', () => {
     }, context);
 
     await captureReached;
+    expect(tab.controllers.streamController!.handleStreamChunk).toHaveBeenCalledWith(
+      { content: 'background result', type: 'text' },
+      expect.objectContaining({ role: 'assistant' }),
+    );
     expect(captureReviewableSettlement).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith(true);
     expect(reportReviewableSettlement).not.toHaveBeenCalled();
@@ -1948,7 +1983,12 @@ describe('Tab provider execution ownership', () => {
     Object.defineProperty(tab.dom.contentEl, 'isConnected', { value: true });
     const handleStreamChunk = jest.fn();
     const save = jest.fn().mockResolvedValue(undefined);
-    tab.controllers.streamController = { handleStreamChunk } as any;
+    tab.controllers.streamController = {
+      createBackgroundStream() { return this; },
+      dispose: jest.fn(),
+      hideThinkingIndicator: jest.fn(),
+      handleStreamChunk,
+    } as any;
     tab.controllers.conversationController = { save } as any;
     const backgroundScope = {
       kind: 'background' as const,
@@ -1999,6 +2039,8 @@ describe('Tab provider execution ownership', () => {
     } as any;
     const handleStreamChunk = jest.fn();
     tab.controllers.streamController = {
+      createBackgroundStream() { return this; },
+      dispose: jest.fn(),
       appendText: jest.fn(),
       finalizeCurrentTextBlock: jest.fn(),
       finalizeCurrentThinkingBlock: jest.fn(),
@@ -2090,6 +2132,29 @@ describe('Tab provider execution ownership', () => {
     expect(onReviewableSettlement).toHaveBeenCalledTimes(1);
   });
 
+  it('applies subagent progress without waiting behind queued background work', async () => {
+    const tab = await createTestTab({ plugin: createPlugin(), containerEl: createMockEl() as any });
+    const handleSubagentProgress = jest.fn();
+    tab.controllers.streamController = { handleSubagentProgress } as any;
+    let releaseBackground!: () => void;
+    const release = new Promise<void>((resolve) => { releaseBackground = resolve; });
+    const blocked = tab.session.enqueueBackgroundWork(() => release);
+    const progress = { toolCallId: 'task-1', summary: 'Reading the auth module' };
+
+    try {
+      coordinatorDeps[0].onSessionEvent?.({
+        progress,
+        scope: { kind: 'session', sequence: 1, sessionInstanceId: 'session-instance-1' },
+        type: 'subagent_progress',
+      }, createEventContext());
+
+      expect(handleSubagentProgress).toHaveBeenCalledWith(progress);
+    } finally {
+      releaseBackground();
+      await blocked;
+    }
+  });
+
   it('drains deferred background rendering before a conversation transition can proceed', async () => {
     const oldConversation = createConversation();
     const nextConversation = {
@@ -2101,7 +2166,7 @@ describe('Tab provider execution ownership', () => {
     const updateConversation = jest.fn().mockResolvedValue(undefined);
     const switchConversation = jest.fn().mockResolvedValue(nextConversation);
     const plugin = createPlugin({
-      getConversationSync: jest.fn((id) => (
+    getConversationSync: jest.fn((id) => (
         id === oldConversation.id ? oldConversation : nextConversation
       )),
       switchConversation,
@@ -2120,6 +2185,7 @@ describe('Tab provider execution ownership', () => {
       addMessage: jest.fn().mockReturnValue(assistantEl),
       finalizeResponse: jest.fn(),
       renderMessages: jest.fn().mockReturnValue(createMockEl()),
+      refreshBranchButtonState: jest.fn(),
       scrollToBottom: jest.fn(),
     } as any;
     let releaseRender!: () => void;
@@ -2128,6 +2194,8 @@ describe('Tab provider execution ownership', () => {
     });
     const handleStreamChunk = jest.fn().mockReturnValue(renderBlocked);
     tab.controllers.streamController = {
+      createBackgroundStream() { return this; },
+      dispose: jest.fn(),
       appendText: jest.fn(),
       finalizeCurrentTextBlock: jest.fn(),
       finalizeCurrentThinkingBlock: jest.fn(),
@@ -2190,7 +2258,7 @@ describe('Tab provider execution ownership', () => {
     const updateConversation = jest.fn().mockResolvedValue(undefined);
     const switchConversation = jest.fn().mockResolvedValue(nextConversation);
     const plugin = createPlugin({
-      getConversationSync: jest.fn((id) => (
+    getConversationSync: jest.fn((id) => (
         id === oldConversation.id ? oldConversation : nextConversation
       )),
       switchConversation,
@@ -2204,6 +2272,7 @@ describe('Tab provider execution ownership', () => {
     tab.state.currentConversationId = oldConversation.id;
     tab.renderer = {
       renderMessages: jest.fn().mockReturnValue(createMockEl()),
+      refreshBranchButtonState: jest.fn(),
     } as any;
     let releaseRecovery!: (applied: boolean) => void;
     const recoveryBlocked = new Promise<boolean>((resolve) => {
@@ -2255,11 +2324,6 @@ describe('Tab provider execution ownership', () => {
   });
 
   it('keeps assembled references structurally stable across idempotent teardown', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const manager = createTabManager(createPlugin());
 
     try {
@@ -2282,7 +2346,6 @@ describe('Tab provider execution ownership', () => {
       expect(coordinator.dispose).toHaveBeenCalledTimes(1);
     } finally {
       await manager.destroy();
-      globalThis.ResizeObserver = originalResizeObserver;
     }
   });
 
@@ -2341,9 +2404,10 @@ describe('Tab provider execution ownership', () => {
     const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
     const coordinator = coordinatorInstances[0];
     let resolveTurn!: () => void;
-    tab.session.activeTurn = new Promise<void>((resolve) => {
+    const pendingTurn = new Promise<void>((resolve) => {
       resolveTurn = resolve;
     });
+    void tab.session.turns.run(() => pendingTurn);
     tab.state.currentConversationId = 'active-conversation';
     const save = jest.fn().mockResolvedValue(undefined);
     tab.controllers.conversationController = { save } as any;
@@ -2356,13 +2420,43 @@ describe('Tab provider execution ownership', () => {
     expect(coordinator.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['creation', 'hydration'] as const)('retains submitted input when close overlaps %s', async phase => {
+    const pending = deferred<any>();
+    const conversation = { providerId: 'claude', messages: [], sessionId: null, selectedModel: 'claude-default', id: 'created-during-close' };
+    const createConversation = jest.fn(() => phase === 'creation' ? pending.promise : Promise.resolve(conversation));
+    const getConversationById = jest.fn(() => pending.promise);
+    const updateConversation = jest.fn().mockResolvedValue(undefined);
+    const plugin = createPlugin({
+      createConversation, getConversationById, updateConversation,
+      renameConversation: jest.fn().mockResolvedValue(undefined),
+    });
+    const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
+    const sending = tab.controllers.inputController.sendMessage({ content: 'Preserve admitted first prompt' });
+    const blockedCall = phase === 'creation' ? createConversation : getConversationById;
+    for (let attempt = 0; attempt < 40 && blockedCall.mock.calls.length === 0; attempt++) {
+      await Promise.resolve();
+    }
+    expect(blockedCall).toHaveBeenCalledTimes(1);
+    const closing = destroyTab(tab);
+    pending.resolve(conversation);
+    await Promise.all([sending, closing]);
+    expect(tab.conversationId).toBe('created-during-close');
+    expect(coordinatorInstances[0].prepare).not.toHaveBeenCalled();
+    tab.state.currentConversationId = 'late-identity';
+    expect(tab.conversationId).toBe('created-during-close');
+    expect(updateConversation).toHaveBeenCalledWith('created-during-close', expect.objectContaining({
+      messages: [expect.objectContaining({ role: 'user', content: 'Preserve admitted first prompt' })],
+    }));
+  });
+
   it('drains an active turn without closing the runtime before its final snapshot', async () => {
     const tab = await createTestTab({ plugin: createPlugin(), containerEl: createMockEl() as any });
     const coordinator = coordinatorInstances[0];
     let resolveTurn!: () => void;
-    tab.session.activeTurn = new Promise<void>((resolve) => {
+    const pendingTurn = new Promise<void>((resolve) => {
       resolveTurn = resolve;
     });
+    void tab.session.turns.run(() => pendingTurn);
 
     const drain = drainTabForShutdownSnapshot(tab);
     for (let attempt = 0; attempt < 10 && coordinator.cancel.mock.calls.length === 0; attempt += 1) {
@@ -2382,14 +2476,9 @@ describe('Tab provider execution ownership', () => {
   });
 
   it('numbers a fork from canonical user turns while retaining non-canonical history', async () => {
-    const originalResizeObserver = globalThis.ResizeObserver;
-    globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
-      disconnect: jest.fn(),
-      observe: jest.fn(),
-    })) as unknown as typeof ResizeObserver;
     const conversation = createConversation();
     const plugin = createPlugin({
-      getConversationSync: jest.fn().mockReturnValue(conversation),
+    getConversationSync: jest.fn().mockReturnValue(conversation),
     });
     const forkRequest = jest.fn().mockResolvedValue(undefined);
     const tab = await createTestTab({
@@ -2398,7 +2487,6 @@ describe('Tab provider execution ownership', () => {
       conversation,
     }, {
       component: {
-        addChild: jest.fn(),
         registerDomEvent: jest.fn(),
         registerEvent: jest.fn(),
       },
@@ -2470,7 +2558,6 @@ describe('Tab provider execution ownership', () => {
     expect(forkRequest.mock.calls[0][0].messages.map((message: { id: string }) => message.id)).toEqual([
       'user-a', 'assistant-a', 'interrupt-a', 'rebuilt-a', 'user-b', 'assistant-b',
     ]);
-    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('drops a fork resolved after its source runtime begins closing', async () => {
@@ -2520,7 +2607,7 @@ describe('Tab provider execution ownership', () => {
       await Promise.resolve();
     }
     expect(coordinatorInstances[0].resolveForkSource).toHaveBeenCalled();
-    tab.lifecycleState = 'closing';
+    tab.session.beginClose();
     forkSource.resolve({
       sessionId: 'native-session',
     });
@@ -2569,7 +2656,7 @@ describe('Tab provider execution ownership', () => {
       attempt += 1) {
       await Promise.resolve();
     }
-    tab.conversationId = 'conversation-b';
+    tab.session.setConversationId('conversation-b');
     forkSource.resolve({ sessionId: 'native-session' });
     await fork;
 
@@ -2594,6 +2681,9 @@ describe('Tab provider execution ownership', () => {
   it('updates permission settings for an unbound tab', async () => {
     const plugin = createPlugin();
     const tab = await createTestTab({ plugin, containerEl: createMockEl() as any });
+
+    plugin.settings.permissionMode = 'yolo';
+    expect(plugin.settings.permissionMode).toBe('yolo');
 
     await updateTabPermissionMode(tab, plugin, 'normal');
 

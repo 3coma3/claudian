@@ -2,12 +2,17 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 
+import { getInstallationKey as getHostnameKey } from '@/core/device/InstallationKey';
+
 jest.mock('cross-spawn', () => jest.fn());
 
 import fixture from '@test/fixtures/providers/grok/extensions/plan-mode-hook.json';
 import spawn from 'cross-spawn';
 
-import { AcpJsonRpcTransport } from '@/providers/acp';
+import { isSteerableExecutionSession, type ProviderExecutionEvent, type ProviderExecutionRequest } from '@/core/execution';
+import type { ProviderHost } from '@/core/providers/ProviderHost';
+import { ACPJSONRPCTransport } from '@/providers/acp';
+import { GrokExecutionBackend } from '@/providers/grok/execution/GrokExecutionBackend';
 import { GrokExecutionNativeConnectionImpl } from '@/providers/grok/execution/GrokExecutionNativeConnection';
 
 function createNativeProcess() {
@@ -30,12 +35,12 @@ function createNativeProcess() {
 }
 
 describe('GrokExecutionNativeConnection', () => {
-  let native: AcpJsonRpcTransport;
+  let native: ACPJSONRPCTransport;
   let connection: GrokExecutionNativeConnectionImpl;
 
   beforeEach(() => {
     const proc = createNativeProcess();
-    native = new AcpJsonRpcTransport({ input: proc.stdin, output: proc.stdout });
+    native = new ACPJSONRPCTransport({ input: proc.stdin, output: proc.stdout });
     native.onRequest('initialize', () => fixture.initializeResult);
     native.start();
     connection = new GrokExecutionNativeConnectionImpl({
@@ -52,6 +57,19 @@ describe('GrokExecutionNativeConnection', () => {
     await connection.shutdown();
     native.dispose();
   });
+
+  it.each(['x.ai/session/interjection', '_x.ai/session/interjection'])(
+    'forwards native interjection application through %s', async method => {
+      const notifications: unknown[] = [];
+      const unsubscribe = connection.onInterjection(notification => notifications.push(notification));
+      await connection.initialize();
+      native.notify(method, { sessionId: 'session', interjectionId: 'redirect' });
+      await native.flush();
+      await new Promise(resolve => setImmediate(resolve));
+      expect(notifications).toEqual([{ sessionId: 'session', interjectionId: 'redirect' }]);
+      unsubscribe();
+    },
+  );
 
   it('registers native plan blocking without replacing session configuration', async () => {
     let received: unknown;
@@ -140,8 +158,53 @@ describe('GrokExecutionNativeConnection', () => {
     }));
 
     await expect(connection.initialize()).rejects.toThrow(
-      'Grok does not support blocking tool hooks. Update Grok to the latest version.',
+      'Grok Build does not support blocking tool hooks. Update Grok Build to the latest version.',
     );
   });
 
+});
+
+it.each([false, true])('terminates on native exit after prompt settled: %s', async settled => {
+  const proc = createNativeProcess();
+  const native = new ACPJSONRPCTransport({ input: proc.stdin, output: proc.stdout });
+  let resolvePrompt!: (value: { stopReason: string }) => void;
+  const prompt = new Promise<{ stopReason: string }>(resolve => { resolvePrompt = resolve; });
+  let started = false;
+  native.onRequest('initialize', () => fixture.initializeResult);
+  native.onRequest('session/new', () => ({ sessionId: 'session' }));
+  native.onRequest('session/set_mode', () => ({}));
+  native.onRequest('session/prompt', () => { started = true; return prompt; });
+  native.onRequest('_x.ai/interject', () => ({ result: { status: 'queued' } }));
+  native.start();
+  const session = new GrokExecutionBackend({ getResolvedProviderCliPath: async () => 'grok', settings: { model: 'grok/grok-4', providerConfigs: { grok: { enabled: true, visibleModels: ['grok-4'], selectedModelsByHost: { [getHostnameKey()]: { fingerprint: 'test', refreshedAt: 1, defaultModelId: 'grok-4', models: [{ rawId: 'grok-4', displayName: 'Grok 4', supportsReasoning: false, reasoningEfforts: [] }] } } } } } } as unknown as ProviderHost, {
+    nativeFactory: { create: options => new GrokExecutionNativeConnectionImpl(options) },
+  }).createSession({
+    vaultWorkingDirectory: '/tmp', lifecycle: 'persistent', nativePersistence: 'enabled',
+    interactionPort: { askUserQuestion: jest.fn(), dismissInteraction: jest.fn(), requestApproval: jest.fn() },
+  });
+  const request: ProviderExecutionRequest = {
+    configuration: { permissionMode: 'normal', systemInstructions: { kind: 'explicit', instructions: 'Answer.' } },
+    input: [{ type: 'text', text: 'hello' }], signal: new AbortController().signal,
+    toolPolicy: { kind: 'provider-default' },
+  };
+  const events: ProviderExecutionEvent[] = [];
+  const collection = (async () => { for await (const event of session.execute(request).events) events.push(event); })();
+  try {
+    for (let i = 0; i < 100 && !started; i++) await new Promise(resolve => setImmediate(resolve));
+    expect(started).toBe(true);
+    if (!isSteerableExecutionSession(session)) throw new Error('No steering');
+    await session.steer(request);
+    if (settled) {
+      resolvePrompt({ stopReason: 'end_turn' });
+      for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    }
+    proc.kill();
+    for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    expect(events.at(-1)).toMatchObject({ type: 'execution_error', category: 'transport', recoverable: true });
+    await collection;
+  } finally {
+    await session.dispose();
+    await collection;
+    native.dispose();
+  }
 });

@@ -24,6 +24,8 @@ export interface ChatTurnRequest {
 
 /** Queued message waiting to be sent after current streaming completes. */
 export interface QueuedMessage {
+  /** Transient delivery observer; queues never persist callbacks. */
+  onDelivery?: (accepted: boolean) => void;
   content: string;
   images?: ImageAttachment[];
   editorContext: EditorSelectionContext | null;
@@ -123,9 +125,20 @@ export interface ChatStateData {
   flavorTimerInterval: number | null;
 }
 
+/**
+ * Runtime-only latest live activity. Streamed text keeps the current block's
+ * immutable string, and tool activity references the live tool record, so
+ * recording stays O(1) per chunk; consumers project it only when displayed.
+ */
+export type ChatActivity =
+  | { kind: 'user'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'thinking' }
+  | { kind: 'tool'; tool: ToolCallInfo }
+  | { kind: 'error'; message: string };
+
 /** Callbacks for ChatState changes. */
 export interface ChatStateCallbacks {
-  onMessagesChanged?: () => void;
   onStreamingStateChanged?: (isStreaming: boolean) => void;
   onRewindingStateChanged?: (isRewinding: boolean) => void;
   onConversationChanged?: (id: string | null) => void;

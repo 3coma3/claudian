@@ -1,5 +1,4 @@
 import type { ProviderHost } from '../../../core/providers/ProviderHost';
-import { ProviderSettingsCoordinator } from '../../../core/providers/ProviderSettingsCoordinator';
 import type {
   ProviderHistoryPathContext,
   ProviderSubagentHistoryRequest,
@@ -20,7 +19,7 @@ export class ClaudeSubagentHistoryService implements ProviderSubagentHistoryServ
       request.providerSessionId,
       request.subagentId,
       undefined,
-      this.buildPathContext(request.vaultPath),
+      this.#buildPathContext(request.vaultPath),
     );
   }
 
@@ -30,21 +29,17 @@ export class ClaudeSubagentHistoryService implements ProviderSubagentHistoryServ
       request.providerSessionId,
       request.subagentId,
       undefined,
-      this.buildPathContext(request.vaultPath),
+      this.#buildPathContext(request.vaultPath),
     );
   }
 
-  private buildPathContext(vaultPath: string): ProviderHistoryPathContext {
+  #buildPathContext(vaultPath: string): ProviderHistoryPathContext {
     const customEnvironment = parseEnvironmentVariables(
       this.host.getActiveEnvironmentVariables('claude'),
     );
     return {
       environment: { ...process.env, ...customEnvironment },
       hostPlatform: process.platform,
-      settings: ProviderSettingsCoordinator.getProviderSettingsSnapshot(
-        this.host.settings,
-        'claude',
-      ),
       vaultPath,
     };
   }

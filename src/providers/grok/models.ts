@@ -1,6 +1,6 @@
 import {
+  DEFAULT_REASONING_VALUE,
   formatReasoningValueLabel,
-  resolvePreferredReasoningDefault,
   STANDARD_REASONING_VALUES,
 } from '../../core/providers/reasoning';
 
@@ -23,7 +23,6 @@ export interface GrokDiscoveredModel {
 }
 
 export const GROK_MODEL_PREFIX = 'grok/';
-export const GROK_CONTEXT_WINDOW_FALLBACK = 200_000;
 const GROK_REASONING_EFFORT_ORDER = ['minimal', 'low', 'medium', 'high', 'xhigh'] as const;
 const GROK_FALLBACK_REASONING_EFFORTS: readonly GrokReasoningEffort[] = Object.freeze(
   STANDARD_REASONING_VALUES.map(value => Object.freeze({
@@ -96,6 +95,19 @@ export function mergeGrokDiscoveredModels(
   return merged;
 }
 
+/** Native names win; a bare `grok-*` id formats as `Grok 4.7`. */
+export function getGrokModelLabel(model: Pick<GrokDiscoveredModel, 'displayName' | 'rawId'>): string {
+  if (model.displayName !== model.rawId) {
+    return model.displayName;
+  }
+  const match = model.rawId.match(/^grok-(\S+)$/i);
+  if (!match) {
+    return model.rawId;
+  }
+  return ['Grok', ...match[1].split('-').filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))].join(' ');
+}
+
 export function findGrokModel(
   models: GrokDiscoveredModel[],
   modelId: string,
@@ -119,17 +131,6 @@ export function getGrokAvailableReasoningEfforts(
   return GROK_FALLBACK_REASONING_EFFORTS;
 }
 
-export function clearGrokReasoningMetadata(
-  model: GrokDiscoveredModel,
-): GrokDiscoveredModel {
-  const cleared = { ...model };
-  delete cleared.defaultReasoningEffort;
-  delete cleared.reasoningMetadataResolved;
-  cleared.reasoningEfforts = [];
-  cleared.supportsReasoning = false;
-  return cleared;
-}
-
 export function resolveGrokDefaultReasoningEffort(
   model: GrokDiscoveredModel | null | undefined,
   preferredEffort?: string,
@@ -140,30 +141,7 @@ export function resolveGrokDefaultReasoningEffort(
     return normalizedPreferred;
   }
 
-  const declaredDefault = model?.defaultReasoningEffort?.trim();
-  if (declaredDefault && availableValues.includes(declaredDefault)) {
-    return declaredDefault;
-  }
-
-  return resolvePreferredReasoningDefault(availableValues, 'high');
-}
-
-export function resolveGrokContextWindow(
-  modelId: string,
-  models: GrokDiscoveredModel[],
-  customContextLimits: Record<string, number> = {},
-): number {
-  const model = findGrokModel(models, modelId);
-  if (model?.contextWindow !== undefined) {
-    return model.contextWindow;
-  }
-
-  const rawModelId = decodeGrokModelId(modelId);
-  const customLimit = customContextLimits[modelId]
-    ?? (rawModelId ? customContextLimits[rawModelId] : undefined);
-  return isPositiveFiniteNumber(customLimit)
-    ? customLimit
-    : GROK_CONTEXT_WINDOW_FALLBACK;
+  return DEFAULT_REASONING_VALUE;
 }
 
 export function normalizeGrokReasoningMetadata(value: unknown): Pick<

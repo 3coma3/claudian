@@ -41,9 +41,7 @@ describe('built-in ProviderModule catalog', () => {
       customModels: {},
       defaultModel: {},
       enableChrome: 'true',
-      lastModel: [],
       loadUserSettings: 'false',
-      safeMode: 'unknown',
     });
     Object.assign(getProviderConfig(malformedSettings, 'codex'), {
       catalogFingerprint: [],
@@ -85,27 +83,23 @@ describe('built-in ProviderModule catalog', () => {
       expect(config.environmentVariables).toEqual(expect.any(String));
     }
 
+    expect(getProviderConfig(normalizedSettings, 'claude')).not.toHaveProperty('defaultModel');
     expect(getProviderConfig(normalizedSettings, 'claude')).toMatchObject({
-      customModels: expect.any(String),
-      defaultModel: expect.any(String),
+      discoveredModels: [],
       enableChrome: false,
-      lastModel: expect.any(String),
       loadUserSettings: true,
-      safeMode: 'default',
     });
+    expect(getProviderConfig(normalizedSettings, 'codex')).not.toHaveProperty('customModels');
     expect(getProviderConfig(normalizedSettings, 'codex')).toMatchObject({
       catalogFingerprint: expect.any(String),
       catalogTimestamp: 0,
-      customModels: expect.any(String),
       reasoningSummary: 'detailed',
       safeMode: 'read-only',
     });
     expect(getProviderConfig(normalizedSettings, 'opencode')).toMatchObject({
       selectedMode: 'claudian-safe',
     });
-    expect(getProviderConfig(normalizedSettings, 'pi')).toMatchObject({
-      toolMode: 'readonly',
-    });
+    expect(getProviderConfig(normalizedSettings, 'pi')).not.toHaveProperty('toolMode');
   });
 
   it('normalizes obsolete OpenCode modes through provider storage', () => {

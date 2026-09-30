@@ -77,11 +77,16 @@
 }
 
 /* Settings page - remove separator lines from setting items */
+.setting-group > .setting-items.claudian-settings-items {
+  background: transparent;
+}
+
 .setting-item.claudian-settings {
   display: block;
   width: 100%;
   padding: 0;
   border-top: none;
+  background: transparent;
 }
 
 .claudian-settings .setting-item {
@@ -107,60 +112,12 @@
   color: var(--text-normal);
 }
 
-.claudian-mcp-settings-desc {
-  margin-bottom: 12px;
-}
-
-.claudian-collab-git-installation-help {
-  margin: var(--size-4-1) var(--size-4-3) var(--size-4-4);
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-}
-
-.claudian-collab-git-installation-help > summary {
-  cursor: pointer;
-  color: var(--text-muted);
-}
-
-.claudian-collab-git-installation-help > summary:hover {
-  color: var(--text-normal);
-}
-
-.claudian-collab-git-installation-help > p {
-  margin: var(--size-4-2) 0;
-}
-
-.claudian-collab-git-path-status {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-inline-start: var(--size-4-1);
-  border-radius: 50%;
-  background: var(--text-faint);
-  vertical-align: middle;
-}
-
-.claudian-collab-git-path-status--available {
-  background: var(--color-green);
-}
-
-.claudian-collab-git-path-status--unavailable {
-  background: var(--color-red);
-}
-
-.claudian-collab-read-more-link {
-  color: var(--text-accent);
-}
-
-.claudian-collab-read-more-link:hover,
-.claudian-collab-read-more-link:focus-visible {
-  color: var(--text-accent-hover);
-}
-
 /* Custom section descriptions - align with items */
-.claudian-sp-settings-desc,
-.claudian-mcp-settings-desc,
-.claudian-plugin-settings-desc {
+.claudian-opencode-migration-notice {
+  margin-bottom: var(--size-4-5);
+}
+
+.claudian-sp-settings-desc {
   padding: 0 12px;
 }
 
@@ -257,7 +214,7 @@
   width: 200px;
 }
 
-/* ── Shared settings panel layout (used by slash-settings + agent-settings) ── */
+/* ── Shared settings panel layout (used by command, skill, and provider agent settings) ── */
 
 .claudian-sp-header {
   display: flex;

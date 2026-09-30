@@ -28,7 +28,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function parseJson(raw: string | undefined): unknown {
+function parseJSON(raw: string | undefined): unknown {
   if (!raw) return undefined;
   try {
     return JSON.parse(raw) as unknown;
@@ -46,7 +46,7 @@ function firstString(record: Record<string, unknown>, keys: readonly string[]): 
 }
 
 function getRawOutput(toolCall: ToolCallInfo | undefined, raw: string | undefined): unknown {
-  return toolCall?.providerPayload?.rawOutput ?? parseJson(raw);
+  return toolCall?.providerPayload?.rawOutput ?? parseJSON(raw);
 }
 
 function extractTaskId(value: unknown): string | undefined {
@@ -195,7 +195,7 @@ function getDescription(spawnToolCall: ToolCallInfo): string {
   if (typeof spawnToolCall.input.subagent_type === 'string' && spawnToolCall.input.subagent_type.trim()) {
     return `${spawnToolCall.input.subagent_type.trim()} subagent`;
   }
-  return 'Grok subagent';
+  return 'Grok Build subagent';
 }
 
 function getPrompt(spawnToolCall: ToolCallInfo): string {

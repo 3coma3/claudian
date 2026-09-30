@@ -9,8 +9,8 @@ const mockProcessStderr = jest.fn().mockReturnValue('');
 const mockResolveLaunchSpec = jest.fn();
 const mockInitializeTransport = jest.fn();
 
-jest.mock('@/providers/codex/runtime/CodexRpcTransport', () => ({
-  CodexRpcTransport: jest.fn().mockImplementation(() => ({
+jest.mock('@/providers/codex/runtime/CodexRPCTransport', () => ({
+  CodexRPCTransport: jest.fn().mockImplementation(() => ({
     request: mockTransportRequest,
     dispose: mockTransportDispose,
     start: mockTransportStart,
@@ -229,7 +229,7 @@ describe('CodexModelDiscoveryService', () => {
 
     await expect(discoveryPromise).resolves.toEqual({
       kind: 'completed',
-      diagnostics: 'Codex model discovery was cancelled',
+      diagnostics: 'Codex CLI model discovery was cancelled',
       models: [],
     });
     expect(mockProcessStart).not.toHaveBeenCalled();

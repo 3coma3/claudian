@@ -1,3 +1,4 @@
+import { getInstallationKey as getHostnameKey } from '@/core/device/InstallationKey';
 import {
   resolveCodexSessionFileHint,
   resolveCodexTranscriptRootHint,
@@ -10,8 +11,8 @@ function createWslContext(distroOverride = '') {
     settings: {
       providerConfigs: {
         codex: {
-          installationMethod: 'wsl',
-          wslDistroOverride: distroOverride,
+          installationMethodsByHost: { [getHostnameKey()]: 'wsl' },
+          wslDistroOverridesByHost: { [getHostnameKey()]: distroOverride },
         },
       },
     },

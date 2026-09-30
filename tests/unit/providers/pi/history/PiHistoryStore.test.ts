@@ -2,17 +2,60 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { testDate, testTime } from '@test/helpers/testClock';
+
 import {
+  correlatePiUserMessages,
   createPiForkSessionFile,
+  getPiTurnStats,
   parsePiSessionContent,
   parsePiSessionEntries,
   type PiSessionEntry,
   resolvePiActivePath,
-  resolvePiEntryPath,
   rollbackCreatedPiForkSessionFile,
 } from '@/providers/pi/history/PiHistoryStore';
+import { encodePiRecoveryPrompt } from '@/providers/pi/history/PiRecoveryPromptCodec';
 
 describe('PiHistoryStore', () => {
+  it('correlates repeated live prompts by their anchored order and leaves unsaved input unbound', () => {
+    const native = parsePiSessionContent([
+      { type: 'message', id: 'u1', parentId: null, message: { role: 'user', content: 'Repeat' } },
+      { type: 'message', id: 'u2', parentId: 'u1', message: { role: 'user', content: 'Repeat' } },
+      { type: 'message', id: 'u3', parentId: 'u2', message: { role: 'user', content: 'Repeat' } },
+    ].map(entry => JSON.stringify(entry)).join('\n'));
+    const live = native.map((message, index) => ({ ...message, id: `local-${index}`,
+      userMessageId: index === 1 ? 'u2' : undefined }));
+    expect(correlatePiUserMessages(live, native)).toEqual({ 'local-0': 'u1', 'local-1': 'u2', 'local-2': 'u3' });
+    expect(correlatePiUserMessages([...live, { ...live[2], id: 'unsaved' }], native)).toEqual({ 'local-0': 'u1', 'local-1': 'u2' });
+  });
+
+  it('projects sibling prompts across configuration entries without mixing their continuations', () => {
+    const content = [
+      { type: 'message', id: 'u1', parentId: null, message: { role: 'user', content: 'A' } },
+      { type: 'message', id: 'a1', parentId: 'u1', message: { role: 'assistant', content: 'Answer A' } },
+      { type: 'model_change', id: 'model', parentId: null },
+      { type: 'message', id: 'u2', parentId: 'model', message: { role: 'user', content: 'B' } },
+      { type: 'message', id: 'a2', parentId: 'u2', message: { role: 'assistant', content: 'Answer B' } },
+    ].map(entry => JSON.stringify(entry)).join('\n');
+    expect(parsePiSessionContent(content, { leafEntryId: 'a1' })).toMatchObject([
+      { content: 'A', treeBranches: ['u1', 'u2'] }, { content: 'Answer A' },
+    ]);
+    expect(parsePiSessionContent(content, { leafEntryId: 'a2' })).toMatchObject([
+      { content: 'B', treeBranches: ['u1', 'u2'] }, { content: 'Answer B' },
+    ]);
+  });
+
+  it('recovers the accepted prompt when an acknowledged steer was never consumed', () => {
+    const native = parsePiSessionContent([
+      { type: 'message', id: 'u1', parentId: null, message: { role: 'user', content: 'First' } },
+      { type: 'message', id: 'u2', parentId: 'u1', message: { role: 'user', content: 'Second' } },
+    ].map(entry => JSON.stringify(entry)).join('\n'));
+    const live = [native[0], { ...native[1], id: 'accepted', userMessageId: undefined,
+      executionInput: { schemaVersion: 1 as const, canonicalText: 'Second' } },
+    { ...native[1], id: 'queued', content: 'Queued steer', userMessageId: undefined }];
+    expect(correlatePiUserMessages(live, native)).toEqual({ u1: 'u1', accepted: 'u2' });
+  });
+
   it('parses linear user and assistant messages', () => {
     const content = [
       JSON.stringify({ type: 'session', id: 's1' }),
@@ -33,6 +76,7 @@ describe('PiHistoryStore', () => {
     const messages = parsePiSessionContent(content);
 
     expect(messages).toHaveLength(2);
+    expect(messages[0].treeBranches).toBeUndefined();
     expect(messages[0]).toMatchObject({
       content: 'Hello',
       role: 'user',
@@ -51,40 +95,40 @@ describe('PiHistoryStore', () => {
 
   it('restores turn duration through tool calls using the final entry timestamp', () => {
     const content = [
-      { type: 'message', id: 'u1', timestamp: '2026-09-07T10:00:00.010Z',
-        message: { role: 'user', timestamp: 1788775200000, content: 'Inspect' } },
-      { type: 'message', id: 'a1', parentId: 'u1', timestamp: '2026-09-07T10:00:04Z',
-        message: { role: 'assistant', timestamp: 1788775200010, stopReason: 'toolUse',
+      { type: 'message', id: 'u1', timestamp: testTime({ days: 11, hours: 10, milliseconds: 10 }),
+        message: { role: 'user', timestamp: testDate({ days: 11, hours: 10 }).getTime(), content: 'Inspect' } },
+      { type: 'message', id: 'a1', parentId: 'u1', timestamp: testTime({ days: 11, hours: 10, seconds: 4 }),
+        message: { role: 'assistant', timestamp: testDate({ days: 11, hours: 10, milliseconds: 10 }).getTime(), stopReason: 'toolUse',
           content: [{ type: 'toolCall', id: 'read', name: 'read', arguments: { path: 'README.md' } }] } },
-      { type: 'message', id: 'tr1', parentId: 'a1', timestamp: '2026-09-07T10:00:05Z',
+      { type: 'message', id: 'tr1', parentId: 'a1', timestamp: testTime({ days: 11, hours: 10, seconds: 5 }),
         message: { role: 'toolResult', toolCallId: 'read', content: [{ type: 'text', text: 'Details' }] } },
-      { type: 'message', id: 'a2', parentId: 'tr1', timestamp: '2026-09-07T10:01:05.900Z',
-        message: { role: 'assistant', timestamp: 1788775205000, stopReason: 'stop',
+      { type: 'message', id: 'a2', parentId: 'tr1', timestamp: testTime({ days: 11, hours: 10, minutes: 1, seconds: 5, milliseconds: 900 }),
+        message: { role: 'assistant', timestamp: testDate({ days: 11, hours: 10, seconds: 5 }).getTime(), stopReason: 'stop',
           content: [{ type: 'text', text: 'Complete.' }] } },
     ].map(entry => JSON.stringify(entry)).join('\n');
 
     expect(parsePiSessionContent(content)).toMatchObject([
       { role: 'user', content: 'Inspect' },
-      { role: 'assistant', assistantMessageId: 'a2', content: 'Complete.', durationSeconds: 65, completedAt: Date.parse('2026-09-07T10:01:05.900Z') },
+      { role: 'assistant', assistantMessageId: 'a2', content: 'Complete.', durationSeconds: 65, completedAt: Date.parse(testTime({ days: 11, hours: 10, minutes: 1, seconds: 5, milliseconds: 900 })) },
     ]);
     expect(parsePiSessionContent(content, { leafEntryId: 'a1' })[1].durationSeconds).toBeUndefined();
   });
 
   it.each([
-    ['stop', '2026-09-07T10:00:00.900Z', 0],
-    ['length', '2026-09-07T10:00:05Z', 5],
-    ['aborted', '2026-09-07T10:00:05Z', undefined],
-    ['error', '2026-09-07T10:00:05Z', undefined],
-    ['toolUse', '2026-09-07T10:00:05Z', undefined],
+    ['stop', testTime({ days: 11, hours: 10, milliseconds: 900 }), 0],
+    ['length', testTime({ days: 11, hours: 10, seconds: 5 }), 5],
+    ['aborted', testTime({ days: 11, hours: 10, seconds: 5 }), undefined],
+    ['error', testTime({ days: 11, hours: 10, seconds: 5 }), undefined],
+    ['toolUse', testTime({ days: 11, hours: 10, seconds: 5 }), undefined],
     ['stop', undefined, undefined],
     ['stop', 'invalid', undefined],
-    ['stop', '2026-09-07T09:59:59Z', undefined],
+    ['stop', testTime({ days: 11, hours: 9, minutes: 59, seconds: 59 }), undefined],
   ])('restores only completed durations with valid timing (%s, %s)', (stopReason, timestamp, expected) => {
     const content = [
-      { id: 'u1', type: 'message', timestamp: '2026-09-07T10:00:00Z',
+      { id: 'u1', type: 'message', timestamp: testTime({ days: 11, hours: 10 }),
         message: { role: 'user', content: 'Inspect' } },
       { id: 'a1', parentId: 'u1', type: 'message', timestamp,
-        message: { role: 'assistant', timestamp: 1788775200010, stopReason, content: 'Reply' } },
+        message: { role: 'assistant', timestamp: testDate({ days: 11, hours: 10, milliseconds: 10 }).getTime(), stopReason, content: 'Reply' } },
     ].map(entry => JSON.stringify(entry)).join('\n');
 
     expect(parsePiSessionContent(content)[1].durationSeconds).toBe(expected);
@@ -92,13 +136,13 @@ describe('PiHistoryStore', () => {
 
   it('starts timing again at the next user prompt', () => {
     const content = [
-      { id: 'u1', type: 'message', timestamp: '2026-09-07T10:00:00Z',
+      { id: 'u1', type: 'message', timestamp: testTime({ days: 11, hours: 10 }),
         message: { role: 'user', content: 'First' } },
-      { id: 'a1', parentId: 'u1', type: 'message', timestamp: '2026-09-07T10:00:05Z',
+      { id: 'a1', parentId: 'u1', type: 'message', timestamp: testTime({ days: 11, hours: 10, seconds: 5 }),
         message: { role: 'assistant', stopReason: 'stop', content: 'First reply' } },
-      { id: 'u2', parentId: 'a1', type: 'message', timestamp: '2026-09-07T12:00:00Z',
+      { id: 'u2', parentId: 'a1', type: 'message', timestamp: testTime({ days: 11, hours: 12 }),
         message: { role: 'user', content: 'Second' } },
-      { id: 'a2', parentId: 'u2', type: 'message', timestamp: '2026-09-07T12:00:03Z',
+      { id: 'a2', parentId: 'u2', type: 'message', timestamp: testTime({ days: 11, hours: 12, seconds: 3 }),
         message: { role: 'assistant', stopReason: 'stop', content: 'Second reply' } },
     ].map(entry => JSON.stringify(entry)).join('\n');
 
@@ -584,17 +628,6 @@ describe('PiHistoryStore', () => {
     }]);
   });
 
-  it('resolves a strict entry path for fork checkpoints without sibling branches', () => {
-    const entries = parsePiSessionEntries([
-      JSON.stringify({ id: 'u1', type: 'message', message: { role: 'user', content: 'First' } }),
-      JSON.stringify({ id: 'a1', parentId: 'u1', type: 'message', message: { role: 'assistant', content: 'Done' } }),
-      JSON.stringify({ id: 'u2', parentId: 'a1', type: 'message', message: { role: 'user', content: 'Next branch' } }),
-      JSON.stringify({ id: 'a2', parentId: 'u2', type: 'message', message: { role: 'assistant', content: 'Later' } }),
-    ].join('\n')).entries;
-
-    expect(resolvePiEntryPath(entries, 'a1').map(entry => entry.id)).toEqual(['u1', 'a1']);
-  });
-
   it('truncates linear Pi sessions through the requested checkpoint', () => {
     const content = [
       JSON.stringify({ id: 'u1', type: 'message', message: { role: 'user', content: 'First' } }),
@@ -602,9 +635,6 @@ describe('PiHistoryStore', () => {
       JSON.stringify({ id: 'u2', type: 'message', message: { role: 'user', content: 'Later' } }),
       JSON.stringify({ id: 'a2', type: 'message', message: { role: 'assistant', content: 'Do not include' } }),
     ].join('\n');
-    const entries = parsePiSessionEntries(content).entries;
-
-    expect(resolvePiEntryPath(entries, 'a1').map(entry => entry.id)).toEqual(['u1', 'a1']);
     expect(parsePiSessionContent(content, { leafEntryId: 'a1' }).map(message => message.content)).toEqual([
       'First',
       'Done',
@@ -633,14 +663,14 @@ describe('PiHistoryStore', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pi-fork-'));
     const sourceFile = path.join(dir, 'source.jsonl');
     await fs.writeFile(sourceFile, [
-      JSON.stringify({ type: 'session', version: 3, id: 'source-session', timestamp: '2026-01-01T00:00:00.000Z', cwd: '/source-cwd' }),
+      JSON.stringify({ type: 'session', version: 3, id: 'source-session', timestamp: testTime({ days: -238 }), cwd: '/source-cwd' }),
       JSON.stringify({ id: 'u1', parentId: null, type: 'message', message: { role: 'user', content: 'First' } }),
       JSON.stringify({ id: 'a1', parentId: 'u1', type: 'message', message: { role: 'assistant', content: 'Done' } }),
       JSON.stringify({ id: 'u2', parentId: 'a1', type: 'message', message: { role: 'user', content: 'Do not copy' } }),
     ].join('\n'));
 
     const forked = await createPiForkSessionFile(sourceFile, 'a1', {
-      now: new Date('2026-02-03T04:05:06.789Z'),
+      now: testDate({ days: -205, hours: 4, minutes: 5, seconds: 6, milliseconds: 789 }),
       sessionId: 'fork-session',
       targetCwd: '/target-cwd',
     });
@@ -650,7 +680,7 @@ describe('PiHistoryStore', () => {
     expect(forked).toEqual({
       leafEntryId: 'a1',
       parentSession: sourceFile,
-      sessionFile: path.join(dir, '2026-02-03T04-05-06-789Z_fork-session.jsonl'),
+      sessionFile: path.join(dir, `${testTime({ days: -205, hours: 4, minutes: 5, seconds: 6, milliseconds: 789 }).replace(/[:.]/g, '-')}_fork-session.jsonl`),
       sessionId: 'fork-session',
     });
     expect(forkedLines).toEqual([
@@ -658,7 +688,7 @@ describe('PiHistoryStore', () => {
         cwd: '/target-cwd',
         id: 'fork-session',
         parentSession: sourceFile,
-        timestamp: '2026-02-03T04:05:06.789Z',
+        timestamp: testTime({ days: -205, hours: 4, minutes: 5, seconds: 6, milliseconds: 789 }),
         type: 'session',
         version: 3,
       },
@@ -698,7 +728,7 @@ describe('PiHistoryStore', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pi-fork-linear-'));
     const sourceFile = path.join(dir, 'source.jsonl');
     await fs.writeFile(sourceFile, [
-      JSON.stringify({ type: 'session', version: 3, id: 'source-session', timestamp: '2026-01-01T00:00:00.000Z', cwd: '/source-cwd' }),
+      JSON.stringify({ type: 'session', version: 3, id: 'source-session', timestamp: testTime({ days: -238 }), cwd: '/source-cwd' }),
       JSON.stringify({ id: 'u1', type: 'message', message: { role: 'user', content: 'Read a file' } }),
       JSON.stringify({
         id: 'a1',
@@ -719,7 +749,7 @@ describe('PiHistoryStore', () => {
     ].join('\n'));
 
     const forked = await createPiForkSessionFile(sourceFile, 'a1', {
-      now: new Date('2026-02-03T04:05:06.789Z'),
+      now: testDate({ days: -205, hours: 4, minutes: 5, seconds: 6, milliseconds: 789 }),
       sessionId: 'fork-session',
     });
     const forkedContent = await fs.readFile(forked.sessionFile, 'utf-8');
@@ -747,4 +777,34 @@ describe('PiHistoryStore', () => {
 
     expect(parsePiSessionContent(content)[0].contentBlocks).toEqual([{ type: 'context_compacted' }]);
   });
+});
+
+it.each([false, true])('restores Pi turn output across tool loops (missing usage: %s)', (missing) => {
+  const content = [
+    { type: 'session', id: 'session' },
+    { type: 'message', id: 'u', parentId: null, timestamp: testTime({ days: 24, hours: 11, milliseconds: 10 }),
+      message: { role: 'user', content: 'Work', timestamp: Date.parse(testTime({ days: 24, hours: 11 })) } },
+    { type: 'message', id: 'a', parentId: 'u', timestamp: testTime({ days: 24, hours: 11, seconds: 1 }),
+      message: { role: 'assistant', stopReason: 'toolUse', usage: missing ? undefined : { output: 100 },
+        content: [{ type: 'toolCall', id: 'tool', name: 'read', arguments: {} }] } },
+    { type: 'message', id: 'r', parentId: 'a', timestamp: testTime({ days: 24, hours: 11, seconds: 2 }),
+      message: { role: 'toolResult', toolCallId: 'tool', content: [{ type: 'text', text: 'Result' }] } },
+    { type: 'message', id: 'final', parentId: 'r', timestamp: testTime({ days: 24, hours: 11, seconds: 2, milliseconds: 500 }),
+      message: { role: 'assistant', stopReason: 'stop', usage: { output: 25 },
+        timestamp: Date.parse(testTime({ days: 24, hours: 11, seconds: 2 })), content: [{ type: 'text', text: 'Done' }] } },
+  ].map(entry => JSON.stringify(entry)).join('\n');
+  expect(parsePiSessionContent(content).at(-1)?.turnStats).toEqual(missing ? undefined : { outputTokens: 125, durationMs: 2500 });
+});
+
+
+it('keeps live and replay stats unavailable for a hidden recovery-only input', () => {
+  const content = [
+    { type: 'message', id: 'recovery', timestamp: testTime({ days: 24, hours: 11 }),
+      message: { role: 'user', content: encodePiRecoveryPrompt('User: Previous question', null) } },
+    { type: 'message', id: 'answer', parentId: 'recovery', timestamp: testTime({ days: 24, hours: 11, seconds: 2, milliseconds: 500 }),
+      message: { role: 'assistant', content: 'Answer', stopReason: 'stop', usage: { output: 125 } } },
+  ].map(record => JSON.stringify(record)).join('\n');
+  const entries = resolvePiActivePath(parsePiSessionEntries(content).entries);
+  expect(getPiTurnStats(entries, 'answer')).toBeUndefined();
+  expect(parsePiSessionContent(content).at(-1)?.turnStats).toBeUndefined();
 });

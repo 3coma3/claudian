@@ -1,4 +1,3 @@
-export type HiddenProviderCommands = Record<string, string[]>;
 
 export interface ApprovalSelectionDecision {
   type: 'select-option';
@@ -80,33 +79,19 @@ export interface AuxiliaryContinuityReset {
   success: false;
   resetRequired: true;
   error: string;
-  refinedInstruction?: never;
   editedText?: never;
   insertedText?: never;
   clarification?: never;
 }
 
-/** Ordinary result from an instruction refinement agent query. */
-export interface InstructionRefineOutcome {
-  success: boolean;
-  resetRequired?: false;
-  refinedInstruction?: string;  // The refined instruction text
-  clarification?: string;       // Agent's clarifying question (if any)
-  error?: string;               // Error message (if failed)
-}
-
-export type InstructionRefineResult =
-  | InstructionRefineOutcome
-  | AuxiliaryContinuityReset;
-
-/** Permission mode for tool execution. */
+/** Safe/YOLO permission values shared by providers with a two-mode control. */
 export type PermissionMode = 'yolo' | 'normal';
 
 /** Scope for environment variable storage and snippets. */
 export type EnvironmentScope = 'shared' | `provider:${string}`;
 
 /** Opaque device-keyed CLI paths for per-device configuration. */
-export type HostnameCliPaths = Record<string, string>;
+export type HostnameCLIPaths = Record<string, string>;
 
 /** Opaque provider-owned settings bags keyed by provider id. */
 export type ProviderConfigMap = Partial<Record<string, Record<string, unknown>>>;
@@ -128,8 +113,8 @@ export interface ClaudianSettings {
   // User preferences
   userName: string;
 
-  // Security
-  permissionMode: PermissionMode;
+  // Security (provider interprets values)
+  permissionMode: string;
 
   // Model & thinking (provider interprets values)
   model: string;
@@ -149,7 +134,6 @@ export interface ClaudianSettings {
   sharedEnvironmentVariables: string;
   envSnippets: EnvSnippet[];
   customContextLimits: Record<string, number>;
-  customModelAliases: Record<string, string>;
 
   // UI settings
   keyboardNavigation: KeyboardNavigationSettings;
@@ -173,9 +157,6 @@ export interface ClaudianSettings {
   // Internal lifecycle state. Entries remain until all affected session metadata is durable.
   pendingProviderSessionInvalidations: Partial<Record<string, number>>;
 
-  // State (provider-specific, round-tripped opaquely)
-  lastCustomModel?: string;
-
   // UI preferences
   maxWarmAgentProcesses: number;
   enableAutoScroll: boolean;
@@ -183,18 +164,21 @@ export interface ClaudianSettings {
   deferMathRenderingDuringStreaming: boolean;
   expandFileEditsByDefault: boolean;
   chatViewPlacement: ChatViewPlacement;
+  enableZenMode: boolean;
   enableDualPane: boolean;
   dualPaneSide: DualPaneSide;
   restoreTabsOnStartup: boolean;
-  collabEnabled: boolean;
-  collabProjectsFolder: string;
-  collabGitPath: string;
+  /**
+   * Vault-wide record that Sync unified Claude skills into `.agents/skills`. The
+   * `.claude/skills` link itself is per device and always read from disk.
+   */
+  skillsSynced: boolean;
   sessionManagerOrganization?: SessionManagerOrganization;
   sessionManagerSort?: SessionManagerSort;
   pinnedLinkedContentPaths?: string[];
 
   // Provider command visibility
-  hiddenProviderCommands: HiddenProviderCommands;
+  hiddenCommands: string[];
 
   // Allow provider-specific extension fields
   [key: string]: unknown;

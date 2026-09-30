@@ -21,7 +21,10 @@
 @import "./components/composer-editor.css";
 @import "./components/context-tray.css";
 @import "./components/context-footer.css";
+@import "./components/composer-info-row.css";
 @import "./components/composer-dropdown.css";
+@import "./components/side-chat.css";
+@import "./components/zen-mode.css";
 
 /* Toolbar */
 @import "./toolbar/model-selector.css";
@@ -39,32 +42,18 @@
 @import "./features/diff.css";
 @import "./features/resume-session.css";
 @import "./features/ask-user-question.css";
-@import "./features/collab-git.css";
-@import "./features/collab-project.css";
-@import "./features/collab-join.css";
-@import "./features/collab-panel.css";
-@import "./features/collab-publish.css";
-@import "./features/collab-requests.css";
-@import "./features/collab-markdown-editor.css";
-@import "./features/collab-comments.css";
-@import "./features/collab-tickets.css";
-@import "./features/collab-review.css";
-@import "./features/collab-conflicts.css";
-@import "./features/collab-access.css";
-@import "./features/collab-polish.css";
 
 /* Modals */
-@import "./modals/instruction.css";
 @import "./modals/fork-target.css";
 
 /* Settings */
 @import "./settings/base.css";
+@import "./settings/cli-installation.css";
 @import "./settings/env-snippets.css";
 @import "./settings/slash-settings.css";
-@import "./settings/plugin-settings.css";
-@import "./settings/agent-settings.css";
 @import "./settings/agent-skills.css";
 @import "./settings/provider-model-picker.css";
+@import "./settings/groups.css";
 
 /* Accessibility */
 @import "./accessibility.css";

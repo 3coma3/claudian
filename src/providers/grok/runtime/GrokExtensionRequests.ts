@@ -1,9 +1,9 @@
-import type { AcpContentBlock, AcpJsonRpcTransport } from '../../acp';
+import type { ACPContentBlock, ACPJSONRPCTransport } from '../../acp';
 
 const GROK_REWIND_TIMEOUT_MS = 120_000;
 
 export interface GrokInterjectRequest {
-  content?: AcpContentBlock[];
+  content?: ACPContentBlock[];
   interjectionId: string;
   sessionId: string;
   text: string;
@@ -45,7 +45,7 @@ export interface GrokRewindResponse {
 }
 
 export async function requestGrokInterjection(
-  transport: AcpJsonRpcTransport,
+  transport: ACPJSONRPCTransport,
   request: GrokInterjectRequest,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -61,24 +61,24 @@ export async function requestGrokInterjection(
     || !isRecord(result)
     || result.status !== 'queued'
   ) {
-    throw new Error('Grok returned a malformed interjection response.');
+    throw new Error('Grok Build returned a malformed interjection response.');
   }
 }
 
 export async function requestGrokSessionFork(
-  transport: AcpJsonRpcTransport,
+  transport: ACPJSONRPCTransport,
   request: GrokForkSessionRequest,
 ): Promise<GrokForkSessionResponse> {
   const response = await transport.request<unknown>('_x.ai/session/fork', request);
   if (!isRecord(response)) {
-    throw new Error('Grok returned a malformed fork response.');
+    throw new Error('Grok Build returned a malformed fork response.');
   }
   const newCwd = readString(response.newCwd);
   const newSessionId = readString(response.newSessionId);
   const parentSessionId = readString(response.parentSessionId);
   const newModelId = readString(response.newModelId);
   if (!newCwd || !newSessionId || !parentSessionId) {
-    throw new Error('Grok returned a malformed fork response.');
+    throw new Error('Grok Build returned a malformed fork response.');
   }
   return {
     newCwd,
@@ -89,7 +89,7 @@ export async function requestGrokSessionFork(
 }
 
 export async function requestGrokRewind(
-  transport: AcpJsonRpcTransport,
+  transport: ACPJSONRPCTransport,
   request: GrokRewindRequest,
 ): Promise<GrokRewindResponse> {
   const response = await transport.request<unknown>(
@@ -98,18 +98,18 @@ export async function requestGrokRewind(
     { timeoutMs: request.force ? 0 : GROK_REWIND_TIMEOUT_MS },
   );
   if (!isRecord(response)) {
-    throw new Error('Grok returned a malformed rewind response.');
+    throw new Error('Grok Build returned a malformed rewind response.');
   }
   const targetPromptIndex = readNonNegativeInteger(
     response.target_prompt_index ?? response.targetPromptIndex,
   );
   const mode = readRewindMode(response.mode);
   if (typeof response.success !== 'boolean' || targetPromptIndex === null || !mode) {
-    throw new Error('Grok returned a malformed rewind response.');
+    throw new Error('Grok Build returned a malformed rewind response.');
   }
   const conflicts = normalizeConflicts(response.conflicts);
   if (!conflicts) {
-    throw new Error('Grok returned a malformed rewind response.');
+    throw new Error('Grok Build returned a malformed rewind response.');
   }
   return {
     cleanFiles: readStringArray(response.clean_files ?? response.cleanFiles) ?? [],

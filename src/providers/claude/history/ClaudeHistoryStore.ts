@@ -1,35 +1,33 @@
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import * as fs from 'fs/promises';
 
 import type { ProviderHistoryPathContext } from '../../../core/providers/types';
 import type { ChatMessage, SubagentInfo, ToolCallInfo } from '../../../core/types';
 import { ClaudeTaskToolNormalizer } from '../normalization/ClaudeTaskToolNormalizer';
+import { ClaudeTaskResultInterpreter } from '../runtime/ClaudeTaskResultInterpreter';
 import { isClaudeSubagentToolName } from '../subagentToolNames';
+import { ClaudeTurnStats } from './ClaudeTurnStats';
 import { buildAsyncSubagentInfo } from './sdkAsyncSubagent';
 import { filterActiveBranch } from './sdkBranchFilter';
-import type { SDKNativeMessage, SDKSessionLoadResult } from './sdkHistoryTypes';
+import type { SDKNativeMessage, SDKSessionLoadResult, SDKSessionReadResult } from './sdkHistoryTypes';
 import {
   collectAsyncSubagentResults,
   collectStructuredPatchResults,
   collectToolResults,
-  extractXmlTag,
-  hydrateFallbackAskUserAnswers,
   hydrateStructuredToolResults,
+  isCanonicalSDKUserMessage,
   isSystemInjectedMessage,
   mergeAssistantMessage,
   parseSDKMessageToChat,
+  parseTaskNotification,
 } from './sdkMessageParsing';
 import {
   encodeVaultPathForSDK,
   getSDKProjectsPath,
-  getSDKSessionAvailability,
   getSDKSessionPath,
-  isValidSessionId,
   locateSDKSession,
   locateSDKSessions,
   readSDKSession,
   readSDKSessionFile,
-  sdkSessionExists,
 } from './sdkSessionPaths';
 import {
   isValidAgentId,
@@ -37,91 +35,75 @@ import {
   loadSubagentToolCalls,
 } from './sdkSubagentSidecar';
 
-export type {
-  ClaudeSessionTimeCandidate,
-  ClaudeSessionTimeFingerprint,
-} from './ClaudeSessionRecovery';
+export { recoverSDKSessionIdByTime } from './ClaudeSessionRecovery';
 export {
-  recoverSDKSessionIdByTime,
-  selectClaudeSessionRecoveryCandidate,
-} from './ClaudeSessionRecovery';
-export type {
-  AsyncSubagentResult,
-  ResolvedAsyncStatus,
-  SDKNativeContentBlock,
-  SDKNativeMessage,
-  SDKSessionLoadResult,
-  SDKSessionReadResult,
-} from './sdkHistoryTypes';
-export {
-  collectAsyncSubagentResults,
   encodeVaultPathForSDK,
-  extractXmlTag,
-  filterActiveBranch,
   getSDKProjectsPath,
-  getSDKSessionAvailability,
-  getSDKSessionPath,
-  isValidSessionId,
   loadSubagentFinalResult,
   loadSubagentToolCalls,
   locateSDKSession,
   locateSDKSessions,
-  parseSDKMessageToChat,
-  readSDKSession,
-  readSDKSessionFile,
-  sdkSessionExists,
 };
-export {
-  extractAgentIdFromToolUseResult,
-  resolveToolUseResultStatus,
-} from './sdkAsyncSubagent';
 
-export function parseLegacyConversationSessionId(
-  content: string,
-  conversationId: string,
+/**
+ * Opening a conversation without a stored model reads its transcript for the model and then
+ * hydrates the same transcript. A model read hands its parse to the next message load of the
+ * unchanged file instead of parsing it twice. Entries are taken once, so the load may mutate
+ * them; unopened entries expire so bulk model recovery does not retain transcripts.
+ */
+const PENDING_READ_TTL_MS = 30_000;
+const MAX_PENDING_READS = 4;
+const pendingModelReads = new Map<string, {
+  fingerprint: string;
+  read: SDKSessionReadResult;
+  expiryTimer: number;
+}>();
+
+function resolveSessionPath(
+  vaultPath: string,
+  sessionId: string,
+  sessionPath: string | undefined,
+  pathContext: ProviderHistoryPathContext | undefined,
 ): string | null {
-  const firstLine = content.split(/\r?\n/, 1)[0];
-  if (!firstLine) {
-    return null;
-  }
-
+  if (sessionPath) return sessionPath;
   try {
-    const record = JSON.parse(firstLine) as {
-      type?: unknown;
-      id?: unknown;
-      sessionId?: unknown;
-    };
-    if (
-      record.type !== 'meta'
-      || record.id !== conversationId
-      || typeof record.sessionId !== 'string'
-      || !isValidSessionId(record.sessionId)
-    ) {
-      return null;
-    }
-    return record.sessionId;
+    return getSDKSessionPath(vaultPath, sessionId, pathContext);
   } catch {
     return null;
   }
 }
 
-export async function readLegacyConversationSessionId(
-  vaultPath: string,
-  conversationId: string,
-): Promise<string | null> {
-  if (!isValidSessionId(conversationId)) {
-    return null;
-  }
-
+async function getSessionFingerprint(sessionPath: string): Promise<string | null> {
   try {
-    const content = await fs.readFile(
-      path.join(vaultPath, '.claude', 'sessions', `${conversationId}.jsonl`),
-      'utf8',
-    );
-    return parseLegacyConversationSessionId(content, conversationId);
+    const { mtimeMs, size } = await fs.stat(sessionPath);
+    return `${mtimeMs}:${size}`;
   } catch {
     return null;
   }
+}
+
+function deletePendingModelRead(sessionPath: string): void {
+  const entry = pendingModelReads.get(sessionPath);
+  if (entry) window.clearTimeout(entry.expiryTimer);
+  pendingModelReads.delete(sessionPath);
+}
+
+async function readSessionEntries(
+  vaultPath: string,
+  sessionId: string,
+  sessionPath: string | undefined,
+  pathContext: ProviderHistoryPathContext | undefined,
+): Promise<SDKSessionReadResult> {
+  return sessionPath
+    ? readSDKSessionFile(sessionPath)
+    : readSDKSession(vaultPath, sessionId, pathContext);
+}
+
+async function takePendingModelRead(sessionPath: string | null): Promise<SDKSessionReadResult | null> {
+  const entry = sessionPath ? pendingModelReads.get(sessionPath) : undefined;
+  if (!sessionPath || !entry) return null;
+  deletePendingModelRead(sessionPath);
+  return await getSessionFingerprint(sessionPath) === entry.fingerprint ? entry.read : null;
 }
 
 export async function loadSDKSessionMessages(
@@ -131,17 +113,14 @@ export async function loadSDKSessionMessages(
   sessionPath?: string,
   pathContext?: ProviderHistoryPathContext,
 ): Promise<SDKSessionLoadResult> {
-  const result = sessionPath
-    ? await readSDKSessionFile(sessionPath)
-    : await (pathContext
-      ? readSDKSession(vaultPath, sessionId, pathContext)
-      : readSDKSession(vaultPath, sessionId));
+  const result = await takePendingModelRead(resolveSessionPath(vaultPath, sessionId, sessionPath, pathContext))
+    ?? await readSessionEntries(vaultPath, sessionId, sessionPath, pathContext);
 
   if (result.error) {
     return { messages: [], skippedLines: result.skippedLines, error: result.error };
   }
 
-  const filteredEntries = filterActiveBranch(result.messages, resumeAtMessageId);
+  const filteredEntries = filterActiveBranch(result.messages.filter(entry => !entry.isSidechain), resumeAtMessageId);
 
   const toolResults = collectToolResults(filteredEntries);
   const toolUseResults = collectStructuredPatchResults(filteredEntries);
@@ -152,6 +131,8 @@ export async function loadSDKSessionMessages(
   let pendingAssistant: ChatMessage | null = null;
   let turnStartedAt: number | undefined;
   let lastAssistantAt: number | undefined;
+  let requestedResponsePending = false;
+  let turnStats = new ClaudeTurnStats();
   const taskToolNormalizer = new ClaudeTaskToolNormalizer();
 
   const flushPendingAssistant = (includeDuration: boolean): void => {
@@ -164,18 +145,43 @@ export async function loadSDKSessionMessages(
         ? Math.floor((lastAssistantAt - turnStartedAt) / 1_000)
         : undefined;
       if (includeDuration) {
-        pendingAssistant.durationSeconds = nativeDuration ?? inferredDuration;
+        if (!pendingAssistant.isAutomaticResponse) {
+          pendingAssistant.durationSeconds = nativeDuration !== undefined ? Math.floor(nativeDuration / 1000) : inferredDuration;
+        }
         pendingAssistant.completedAt = lastAssistantAt;
+        pendingAssistant.turnStats = turnStats.finish(turnStartedAt, lastAssistantAt);
       }
       chatMessages.push(pendingAssistant);
     }
     pendingAssistant = null;
     lastAssistantAt = undefined;
     turnStartedAt = undefined;
+    requestedResponsePending = false;
+    turnStats = new ClaudeTurnStats();
   };
 
-  // Merge consecutive assistant messages until an actual user message appears
+  // Preserve task notification boundaries without ending an unfinished requested response.
   for (const sdkMsg of filteredEntries) {
+    const notification = parseTaskNotification(sdkMsg);
+    if (notification !== null) {
+      if (pendingAssistant && requestedResponsePending) {
+        pendingAssistant.contentBlocks?.push({ type: 'task_notification', content: notification });
+        continue;
+      }
+      const requestedStartedAt: number | undefined = pendingAssistant ? undefined : turnStartedAt;
+      flushPendingAssistant(true);
+      turnStartedAt = requestedStartedAt;
+      requestedResponsePending = requestedStartedAt !== undefined;
+      pendingAssistant = {
+        id: sdkMsg.uuid ?? `task-notification-${chatMessages.length}`,
+        role: 'assistant',
+        isAutomaticResponse: requestedStartedAt === undefined,
+        content: '',
+        timestamp: parseNativeTimestamp(sdkMsg.timestamp) ?? 0,
+        contentBlocks: [{ type: 'task_notification', content: notification }],
+      };
+      continue;
+    }
     if (isSystemInjectedMessage(sdkMsg)) continue;
 
     // Skip synthetic assistant messages (e.g., "No response requested." after /compact)
@@ -197,11 +203,14 @@ export async function loadSDKSessionMessages(
         } else {
           pendingAssistant = chatMsg;
         }
+        turnStats.add(sdkMsg);
         lastAssistantAt = parseNativeTimestamp(sdkMsg.timestamp);
+        requestedResponsePending = turnStartedAt !== undefined
+          && sdkMsg.message?.stop_reason === 'tool_use';
       }
     } else {
       flushPendingAssistant(!chatMsg.isInterrupt);
-      if (!chatMsg.isInterrupt && !chatMsg.isRebuiltContext) {
+      if (isCanonicalSDKUserMessage(sdkMsg)) {
         turnStartedAt = parseNativeTimestamp(sdkMsg.timestamp);
       }
       chatMessages.push(chatMsg);
@@ -210,8 +219,21 @@ export async function loadSDKSessionMessages(
 
   flushPendingAssistant(true);
 
+  const taskResults = new ClaudeTaskResultInterpreter();
+  for (const message of chatMessages) {
+    for (const toolCall of message.toolCalls ?? []) {
+      if (!isClaudeSubagentToolName(toolCall.name) || toolCall.input.run_in_background === true
+        || toolCall.result === undefined) continue;
+      const metadata = toolUseResults.get(toolCall.id);
+      const mode = taskResults.describeTask(toolCall.input).mode
+        ?? taskResults.interpretLaunch(toolCall.result, toolCall.status === 'error', metadata).mode;
+      if (mode === 'async') continue;
+      const result = taskResults.interpretResult(toolCall.result, toolCall.status === 'error',
+        { mode: 'sync' }, metadata);
+      toolCall.result = result.result;
+    }
+  }
   hydrateStructuredToolResults(chatMessages, toolUseResults);
-  hydrateFallbackAskUserAnswers(chatMessages);
 
   // Build SubagentInfo for async Agent tool calls from toolUseResult + queue-operation data
   if (toolUseResults.size > 0 || asyncSubagentResults.size > 0) {
@@ -239,15 +261,13 @@ export async function loadSDKSessionMessages(
 
           // Load tool calls from subagent sidecar JSONL in parallel
           if (subagent.agentId && isValidAgentId(subagent.agentId)) {
-            const promise = pathContext
-              ? loadSubagentToolCalls(
-                vaultPath,
-                sessionId,
-                subagent.agentId,
-                sessionPath,
-                pathContext,
-              )
-              : loadSubagentToolCalls(vaultPath, sessionId, subagent.agentId, sessionPath);
+            const promise = loadSubagentToolCalls(
+              vaultPath,
+              sessionId,
+              subagent.agentId,
+              sessionPath,
+              pathContext,
+            );
             sidecarLoads.push({ subagent, promise });
           }
         }
@@ -266,7 +286,17 @@ export async function loadSDKSessionMessages(
     }
   }
 
-  chatMessages.sort((a, b) => a.timestamp - b.timestamp);
+  // Notification timestamps record enqueue time, not consumption. Pin their
+  // transcript boundaries while retaining timestamp ordering (e.g. /compact)
+  // within each intervening section.
+  let sectionStart = 0;
+  for (let index = 0; index <= chatMessages.length; index++) {
+    if (index < chatMessages.length
+      && !chatMessages[index].contentBlocks?.some(block => block.type === 'task_notification')) continue;
+    const section = chatMessages.slice(sectionStart, index).sort((a, b) => a.timestamp - b.timestamp);
+    for (let offset = 0; offset < section.length; offset++) chatMessages[sectionStart + offset] = section[offset];
+    sectionStart = index + 1;
+  }
 
   return { messages: chatMessages, skippedLines: result.skippedLines };
 }
@@ -305,8 +335,7 @@ function collectNativeTurnDurations(
     );
     if (!assistantUuid) continue;
 
-    const durationSeconds = Math.floor(entry.durationMs / 1_000);
-    durations.set(assistantUuid, durationSeconds);
+    durations.set(assistantUuid, entry.durationMs);
   }
   return durations;
 }
@@ -363,14 +392,22 @@ export async function loadSDKSessionModel(
   sessionPath?: string,
   pathContext?: ProviderHistoryPathContext,
 ): Promise<string | null> {
-  const result = sessionPath
-    ? await readSDKSessionFile(sessionPath)
-    : await (pathContext
-      ? readSDKSession(vaultPath, sessionId, pathContext)
-      : readSDKSession(vaultPath, sessionId));
-  return result.error
-    ? null
-    : getLastSDKSessionModel(result.messages, resumeAtMessageId);
+  const resolvedPath = resolveSessionPath(vaultPath, sessionId, sessionPath, pathContext);
+  const fingerprint = resolvedPath ? await getSessionFingerprint(resolvedPath) : null;
+  const result = await readSessionEntries(vaultPath, sessionId, sessionPath, pathContext);
+  if (result.error) return null;
+
+  if (resolvedPath && fingerprint) {
+    deletePendingModelRead(resolvedPath);
+    const expiryTimer = window.setTimeout(() => pendingModelReads.delete(resolvedPath), PENDING_READ_TTL_MS);
+    (expiryTimer as unknown as { unref?: () => void }).unref?.();
+    pendingModelReads.set(resolvedPath, { fingerprint, read: result, expiryTimer });
+    for (const oldest of pendingModelReads.keys()) {
+      if (pendingModelReads.size <= MAX_PENDING_READS) break;
+      deletePendingModelRead(oldest);
+    }
+  }
+  return getLastSDKSessionModel(result.messages, resumeAtMessageId);
 }
 
 function normalizeTaskToolCalls(

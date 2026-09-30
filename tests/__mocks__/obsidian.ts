@@ -1,5 +1,49 @@
 // Mock for Obsidian API
 
+// Match Obsidian's explicit load/unload lifecycle; DOM removal alone does not unload children.
+export class Component {
+  private loaded = false;
+  private children: Component[] = [];
+  private cleanups: (() => void)[] = [];
+
+  load(): void {
+    if (this.loaded) return;
+    this.loaded = true;
+    this.onload();
+    for (const child of this.children.slice()) child.load();
+  }
+
+  unload(): void {
+    if (!this.loaded) return;
+    this.loaded = false;
+    while (this.children.length) this.children.pop()!.unload();
+    while (this.cleanups.length) this.cleanups.pop()!();
+    this.onunload();
+  }
+
+  onload(): void {}
+  onunload(): void {}
+
+  addChild<T extends Component>(child: T): T {
+    this.children.push(child);
+    if (this.loaded) child.load();
+    return child;
+  }
+
+  removeChild<T extends Component>(child: T): T {
+    const index = this.children.indexOf(child);
+    if (index !== -1) {
+      this.children.splice(index, 1);
+      child.unload();
+    }
+    return child;
+  }
+
+  register(callback: () => void): void {
+    this.cleanups.push(callback);
+  }
+}
+
 export class Plugin {
   app: any;
   manifest: any;
@@ -43,9 +87,10 @@ export class PluginSettingTab {
 }
 
 export class ItemView {
-  app: any;
+  app: any = { workspace: { on: jest.fn(), offref: jest.fn() } };
   leaf: any;
   containerEl: any = {
+    isShown: () => true,
     children: [{}, { empty: jest.fn(), addClass: jest.fn(), createDiv: jest.fn().mockReturnValue({
       createEl: jest.fn().mockReturnValue({ addEventListener: jest.fn(), setAttribute: jest.fn() }),
       createDiv: jest.fn().mockReturnValue({ createEl: jest.fn().mockReturnValue({ addEventListener: jest.fn() }) }),
@@ -149,31 +194,6 @@ export class Setting {
   setDesc = jest.fn().mockReturnThis();
   addToggle = jest.fn().mockReturnThis();
   addTextArea = jest.fn().mockReturnThis();
-}
-
-export class TextAreaComponent {
-  inputEl: any;
-  private _value = '';
-
-  constructor(_container?: any) {
-    this.inputEl = {
-      addClass: jest.fn(),
-      rows: 0,
-      placeholder: '',
-      focus: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-    };
-  }
-
-  setValue(value: string): this {
-    this._value = value;
-    return this;
-  }
-
-  getValue(): string {
-    return this._value;
-  }
 }
 
 export class Modal {
@@ -299,6 +319,8 @@ export const MarkdownRenderer = {
   ),
   renderMarkdown: renderMarkdownMock,
 };
+
+export const loadMermaid = jest.fn();
 
 export const loadPrism = jest.fn().mockResolvedValue({
   highlightElement: jest.fn(),

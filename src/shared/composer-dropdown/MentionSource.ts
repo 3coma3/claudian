@@ -14,7 +14,6 @@ import type {
 export interface MentionSourceCallbacks {
   readonly getCachedVaultFiles: () => readonly TFile[];
   readonly getCachedVaultFolders: () => readonly FolderMentionItem[];
-  readonly normalizePathForVault: (path: string | undefined | null) => string | null;
 }
 
 export interface MentionSourceOptions {
@@ -49,15 +48,15 @@ export class MentionSource implements ComposerDropdownSource {
     const extensionFolders = this.extensionFoldersLoader?.(signal);
     if (extensionFolders instanceof Promise) {
       return extensionFolders
-        .then(folders => this.finishRootItems(folders, query, signal))
+        .then(folders => this.#finishRootItems(folders, query, signal))
         .catch(error => {
           if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
             throw error;
           }
-          return this.finishRootItems([], query, signal);
+          return this.#finishRootItems([], query, signal);
         });
     }
-    return this.finishRootItems(extensionFolders ?? [], query, signal);
+    return this.#finishRootItems(extensionFolders ?? [], query, signal);
   }
 
   match(input: string, cursor: number): ComposerTriggerMatch | null {
@@ -100,7 +99,7 @@ export class MentionSource implements ComposerDropdownSource {
     return () => this.listeners.delete(listener);
   }
 
-  private finishRootItems(
+  #finishRootItems(
     extensionFolders: readonly ComposerDropdownFolderItem[],
     query: string,
     signal: AbortSignal,
@@ -110,13 +109,13 @@ export class MentionSource implements ComposerDropdownSource {
     for (const folder of extensionFolders) {
       if (folder.label.toLocaleLowerCase().includes(query)) items.push(folder);
     }
-    items.push(...this.vaultItems(query));
+    items.push(...this.#vaultItems(query));
     return items;
   }
 
-  private vaultItems(query: string): readonly ComposerDropdownValueItem[] {
+  #vaultItems(query: string): readonly ComposerDropdownValueItem[] {
     type Scored = {
-      readonly item: ComposerDropdownValueItem;
+      readonly path: string;
       readonly mtime: number;
       readonly name: string;
       readonly starts: boolean;
@@ -148,16 +147,8 @@ export class MentionSource implements ComposerDropdownSource {
         || folder.name.toLocaleLowerCase().includes(query)
       ))
       .map((folder): Scored => {
-        const normalized = this.callbacks.normalizePathForVault(folder.path) ?? folder.path;
         return {
-          item: {
-            className: 'is-vault-folder',
-            icon: 'folder',
-            id: `vault-folder:${folder.path}`,
-            kind: 'value',
-            label: `@${folder.path}/`,
-            replacement: `@${normalized}/ `,
-          },
+          path: folder.path,
           mtime: folderMtimes.get(folder.path) ?? 0,
           name: folder.name,
           starts: folder.name.toLocaleLowerCase().startsWith(query),
@@ -171,15 +162,8 @@ export class MentionSource implements ComposerDropdownSource {
       .filter(file => file.path.toLocaleLowerCase().includes(query)
         || file.name.toLocaleLowerCase().includes(query))
       .map((file): Scored => {
-        const normalized = this.callbacks.normalizePathForVault(file.path) ?? file.path;
         return {
-          item: {
-            icon: 'file-text',
-            id: `vault-file:${file.path}`,
-            kind: 'value',
-            label: file.path,
-            replacement: (this.options.formatVaultFileMention ?? formatVaultFileMention)(normalized),
-          },
+          path: file.path,
           mtime: file.stat.mtime,
           name: file.name,
           starts: file.name.toLocaleLowerCase().startsWith(query),
@@ -191,7 +175,25 @@ export class MentionSource implements ComposerDropdownSource {
 
     return [...folders, ...fileItems]
       .sort(compare)
-      .map(scored => scored.item);
+      .map((scored): ComposerDropdownValueItem => {
+        if (scored.type === 'folder') {
+          return {
+            className: 'is-vault-folder',
+            icon: 'folder',
+            id: `vault-folder:${scored.path}`,
+            kind: 'value',
+            label: `@${scored.path}/`,
+            replacement: `@${scored.path}/ `,
+          };
+        }
+        return {
+          icon: 'file-text',
+          id: `vault-file:${scored.path}`,
+          kind: 'value',
+          label: scored.path,
+          replacement: (this.options.formatVaultFileMention ?? formatVaultFileMention)(scored.path),
+        };
+      });
   }
 
   private notify(): void {

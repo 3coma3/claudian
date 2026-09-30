@@ -1,114 +1,90 @@
 import type { ProviderCommandCatalog } from '../../../core/providers/commands/ProviderCommandCatalog';
-import type { ProviderVaultEntryRepository } from '../../../core/providers/commands/ProviderVaultEntryRepository';
 import type { ProviderHost } from '../../../core/providers/ProviderHost';
 import { ProviderWorkspaceRegistry } from '../../../core/providers/ProviderWorkspaceRegistry';
 import type {
-  AppAgentManager,
-  AppAgentStorage,
-  AppPluginManager,
-  ProviderCliResolver,
+  ProviderCLIResolver,
   ProviderWorkspaceRegistration,
   ProviderWorkspaceServices,
 } from '../../../core/providers/types';
-import type { VaultFileAdapter } from '../../../core/storage/VaultFileAdapter';
-import { parseEnvironmentVariables } from '../../../utils/env';
-import { getVaultPath } from '../../../utils/path';
-import { AgentManager } from '../agents/AgentManager';
 import {
   ClaudeCommandCatalog,
   type CommandProbe,
 } from '../commands/ClaudeCommandCatalog';
 import { probeRuntimeCommands } from '../commands/probeRuntimeCommands';
-import { resolveClaudeConfigDir } from '../config/ClaudeConfigDir';
-import { PluginManager } from '../plugins/PluginManager';
-import { ClaudeCliResolver } from '../runtime/ClaudeCliResolver';
-import { StorageService } from '../storage/StorageService';
-import { claudeSettingsTabRenderer } from '../ui/ClaudeSettingsTab';
+import type { ClaudeDiscoveredModel } from '../modelCatalog';
+import { ClaudeCLIResolver } from '../runtime/ClaudeCLIResolver';
+import {
+  applySessionClaudeModels,
+  type ClaudeModelProbe,
+  createClaudeModels,
+  discoverClaudeModels,
+} from '../runtime/ClaudeModels';
+import { createClaudeSettingsTabRenderer } from '../ui/ClaudeSettingsTab';
 
 export interface ClaudeWorkspaceServices extends ProviderWorkspaceServices {
-  claudeStorage: StorageService;
-  cliResolver: ProviderCliResolver;
-  pluginManager: AppPluginManager;
-  agentStorage: AppAgentStorage;
-  agentManager: AppAgentManager;
+  cliResolver: ProviderCLIResolver;
   commandCatalog: ProviderCommandCatalog;
-  vaultCommandRepository: ProviderVaultEntryRepository;
+  /** Writes back the model list a live session reported at init. */
+  publishSessionModels(models: ClaudeDiscoveredModel[]): Promise<void>;
   dispose(): Promise<void>;
 }
 
 export interface ClaudeWorkspaceServicesOptions {
   readonly commandProbe?: CommandProbe;
+  readonly modelProbe?: ClaudeModelProbe;
 }
 
 export async function createClaudeWorkspaceServices(
   plugin: ProviderHost,
-  adapter: VaultFileAdapter,
   options: ClaudeWorkspaceServicesOptions = {},
 ): Promise<ClaudeWorkspaceServices> {
-  const claudeStorage = new StorageService(plugin, adapter);
-
-  const cliResolver = new ClaudeCliResolver();
-
-  const vaultPath = getVaultPath(plugin.app) ?? '';
-  const getClaudeConfigDir = () => resolveClaudeConfigDir({
-    environment: {
-      ...process.env,
-      ...parseEnvironmentVariables(plugin.getActiveEnvironmentVariables('claude')),
-    },
-    hostPlatform: process.platform,
-    vaultPath,
-  });
-  const pluginManager = new PluginManager(
-    vaultPath,
-    claudeStorage.ccSettings,
-    getClaudeConfigDir,
-  );
-
-  const agentStorage = claudeStorage.agents;
-  const agentManager = new AgentManager(vaultPath, pluginManager, getClaudeConfigDir);
+  const cliResolver = new ClaudeCLIResolver();
+  const modelCatalog = createClaudeModels(plugin, signal => discoverClaudeModels(plugin, signal, options.modelProbe));
 
   const commandCatalog = new ClaudeCommandCatalog(
-    claudeStorage.commands,
-    claudeStorage.skills,
     options.commandProbe ?? (signal => probeRuntimeCommands(plugin, signal)),
   );
+  let transitioning = false;
+  let disposed = false;
   const unregisterTransitionHook = plugin.executionLifecycleRegistry
     .registerTransitionHook('claude', {
-      beforeTransition: () => commandCatalog.beginEnvironmentTransition(),
-      afterTransition: () => commandCatalog.endEnvironmentTransition(),
+      beforeTransition: async () => {
+        transitioning = true;
+        modelCatalog.beginTransition();
+        await modelCatalog.quiesce();
+        await commandCatalog.beginEnvironmentTransition();
+      },
+      afterTransition: () => {
+        commandCatalog.endEnvironmentTransition();
+        modelCatalog.endTransition();
+        transitioning = false;
+      },
     });
   let disposePromise: Promise<void> | null = null;
 
   return {
-    claudeStorage,
     cliResolver,
-    pluginManager,
-    agentStorage,
-    agentManager,
     commandCatalog,
-    vaultCommandRepository: commandCatalog,
-    settingsTabRenderer: claudeSettingsTabRenderer,
-    prepareSettings: async () => {
-      await pluginManager.loadPlugins();
-      await agentManager.loadAgents();
+    settingsTabRenderer: createClaudeSettingsTabRenderer({ cliResolver, modelCatalog }),
+    modelCatalog,
+    async publishSessionModels(models) {
+      // A session reporting across an environment transition may describe the old runtime.
+      await applySessionClaudeModels(plugin, models, () => !disposed && !transitioning);
     },
     dispose() {
       if (disposePromise) return disposePromise;
+      disposed = true;
       unregisterTransitionHook();
-      disposePromise = commandCatalog.dispose();
+      disposePromise = Promise.all([commandCatalog.dispose(), modelCatalog.dispose()]).then(() => undefined);
       return disposePromise;
     },
   };
 }
 
 export const claudeWorkspaceRegistration: ProviderWorkspaceRegistration<ClaudeWorkspaceServices> = {
-  initialize: async ({ plugin, vaultAdapter }) => createClaudeWorkspaceServices(plugin, vaultAdapter),
+  initialize: async ({ plugin }) => createClaudeWorkspaceServices(plugin),
 };
 
-export function maybeGetClaudeWorkspaceServices(): ClaudeWorkspaceServices | null {
-  return ProviderWorkspaceRegistry.getServices('claude') as ClaudeWorkspaceServices | null;
-}
-
-export function getClaudeWorkspaceServices(): ClaudeWorkspaceServices {
-  return ProviderWorkspaceRegistry.requireServices('claude') as ClaudeWorkspaceServices;
+export function getClaudeWorkspaceServices(): ClaudeWorkspaceServices | null {
+  return ProviderWorkspaceRegistry.getIfInitialized('claude') as ClaudeWorkspaceServices | null;
 }

@@ -12,8 +12,8 @@ interface MockKernelOptions {
 
 const mockKernelOptions: MockKernelOptions[] = [];
 
-jest.mock('@/providers/opencode/execution/OpencodeAcpSessionKernel', () => ({
-  DefaultOpencodeAcpSessionKernel: jest.fn().mockImplementation((options) => {
+jest.mock('@/providers/opencode/execution/OpencodeACPSessionKernel', () => ({
+  DefaultOpencodeACPSessionKernel: jest.fn().mockImplementation((options) => {
     mockKernelOptions.push(options);
     return {
       connect: jest.fn(async () => undefined),
@@ -34,6 +34,7 @@ jest.mock('@/providers/opencode/execution/OpencodeAcpSessionKernel', () => ({
 
 function createPlugin(): any {
   const plugin: any = {
+    getResolvedProviderCliPath: async () => '/not-installed/opencode',
     app: {
       vault: {
         adapter: { basePath: '/vault' },
@@ -47,6 +48,7 @@ function createPlugin(): any {
     ): Promise<void> => {
       mutation(plugin.settings);
     }),
+    mutateSettingsConditionally: jest.fn(async (mutation) => { await mutation(plugin.settings); }),
     notifyProviderChatOptionsChanged: jest.fn(),
     settings: {
       providerConfigs: {

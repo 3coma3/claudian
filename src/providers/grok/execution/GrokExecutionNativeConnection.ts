@@ -1,8 +1,8 @@
 import {
-  AcpClientConnection,
-  AcpJsonRpcTransport,
-  AcpSubprocess,
-  normalizeAcpAvailableCommands,
+  ACPClientConnection,
+  ACPJSONRPCTransport,
+  ACPSubprocess,
+  normalizeACPAvailableCommands,
 } from '../../acp';
 import {
   requestGrokInterjection,
@@ -39,36 +39,36 @@ const GROK_MODEL_UPDATE_NOTIFICATION_METHODS = [
 
 export class GrokExecutionNativeConnectionImpl
 implements GrokExecutionNativeConnection {
-  private readonly connection: AcpClientConnection;
+  private readonly connection: ACPClientConnection;
   private readonly listeners = new Set<Parameters<GrokExecutionNativeConnection['onNotification']>[0]>();
+  private readonly interjectionListeners = new Set<Parameters<NonNullable<GrokExecutionNativeConnection['onInterjection']>>[0]>();
   private readonly modeListeners = new Set<(mode: 'normal' | 'yolo') => void>();
   private readonly modelListeners = new Set<
     Parameters<NonNullable<GrokExecutionNativeConnection['onModelsChanged']>>[0]
   >();
-  private readonly process: AcpSubprocess;
-  private readonly transport: AcpJsonRpcTransport;
+  private readonly process: ACPSubprocess;
+  private readonly transport: ACPJSONRPCTransport;
   private readonly unsubscribers: Array<() => void> = [];
 
   constructor(options: GrokExecutionNativeCreateOptions) {
-    this.process = new AcpSubprocess({
+    this.process = new ACPSubprocess({
       args: ['agent', '--no-leader', 'stdio'],
       command: options.command,
       cwd: options.cwd,
       env: options.env,
     });
     this.process.start();
-    this.transport = new AcpJsonRpcTransport({
+    this.transport = new ACPJSONRPCTransport({
       input: this.process.stdout,
       onClose: listener => this.process.onClose(listener),
       output: this.process.stdin,
     });
-    this.connection = new AcpClientConnection({
+    this.connection = new ACPClientConnection({
       clientInfo: { name: 'claudian', version: options.version },
       delegate: {
         onSessionNotification: notification => this.notify(notification, 'standard'),
         requestPermission: request => options.requestPermission(request),
       },
-      methodOverrides: { cancel: 'session/cancel' },
       transport: this.transport,
     });
     for (const method of [
@@ -78,6 +78,16 @@ implements GrokExecutionNativeConnection {
       this.unsubscribers.push(this.transport.onNotification(method, params => {
         const notification = parseGrokSessionNotification(method, params);
         if (notification) this.notify(notification, 'extension');
+      }));
+    }
+    for (const method of ['x.ai/session/interjection', '_x.ai/session/interjection']) {
+      this.unsubscribers.push(this.transport.onNotification(method, params => {
+        if (!isRecord(params) || typeof params.sessionId !== 'string') return;
+        const notification = {
+          sessionId: params.sessionId,
+          ...(typeof params.interjectionId === 'string' ? { interjectionId: params.interjectionId } : {}),
+        };
+        for (const listener of this.interjectionListeners) listener(notification);
       }));
     }
     for (const method of GROK_EXTENSION_REQUEST_METHODS) {
@@ -133,12 +143,16 @@ implements GrokExecutionNativeConnection {
       || !Array.isArray(hooks.decisions)
       || !hooks.decisions.includes('deny')
     ) {
-      throw new Error('Grok does not support blocking tool hooks. Update Grok to the latest version.');
+      throw new Error('Grok Build does not support blocking tool hooks. Update Grok Build to the latest version.');
     }
   }
 
   isAlive(): boolean {
     return this.process.isAlive();
+  }
+
+  onClose(listener: (error?: Error) => void): () => void {
+    return this.process.onClose(listener);
   }
 
   interject(
@@ -162,9 +176,9 @@ implements GrokExecutionNativeConnection {
       { signal, timeoutMs: 5_000 },
     );
     if (!Array.isArray(response.commands)) {
-      throw new Error('Grok returned malformed command metadata.');
+      throw new Error('Grok Build returned malformed command metadata.');
     }
-    return normalizeAcpAvailableCommands(response.commands);
+    return normalizeACPAvailableCommands(response.commands);
   }
 
   newSession: GrokExecutionNativeConnection['newSession'] = request => (
@@ -176,6 +190,11 @@ implements GrokExecutionNativeConnection {
   ): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onInterjection(listener: Parameters<NonNullable<GrokExecutionNativeConnection['onInterjection']>>[0]): () => void {
+    this.interjectionListeners.add(listener);
+    return () => { this.interjectionListeners.delete(listener); };
   }
 
   onModeChanged(listener: (mode: 'normal' | 'yolo') => void): () => void {
@@ -210,6 +229,7 @@ implements GrokExecutionNativeConnection {
     while (this.unsubscribers.length > 0) this.unsubscribers.pop()?.();
     this.listeners.clear();
     this.modeListeners.clear();
+    this.interjectionListeners.clear();
     this.modelListeners.clear();
     this.connection.dispose();
     this.transport.dispose();

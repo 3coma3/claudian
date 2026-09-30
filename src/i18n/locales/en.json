@@ -4,25 +4,16 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
-    "preview": "Preview",
     "add": "Add",
-    "remove": "Remove",
-    "clear": "Clear",
     "clearAll": "Clear all",
-    "loading": "Loading",
     "error": "Error",
-    "success": "Success",
-    "warning": "Warning",
     "confirm": "Confirm",
-    "settings": "Settings",
     "advanced": "Advanced",
-    "enabled": "Enabled",
-    "disabled": "Disabled",
-    "platform": "Platform",
-    "refresh": "Refresh",
-    "rewind": "Rewind"
+    "refresh": "Refresh"
   },
   "chat": {
+    "selectAvailableModel": "Select an available model before sending.",
+    "selectAvailableTitleModel": "Select an available title model in Claudian settings.",
     "rewind": {
       "confirmMessage": "Rewind to this point? File changes after this message may be overwritten or removed. This cannot be undone.",
       "confirmMessageConflicts": "Rewind to this point? {count} file(s) were modified outside the agent and will be overwritten:\n{files}",
@@ -51,376 +42,68 @@
       "failed": "Fork failed: {error}",
       "unavailableStreaming": "Cannot fork while streaming",
       "unavailableNoUuid": "Cannot fork: missing message identifiers",
-      "unavailableNoResponse": "Cannot fork: no response to fork from",
       "errorMessageNotFound": "Message not found",
       "errorNoSession": "No session ID available",
       "errorNoActiveTab": "No active tab",
       "commandNoMessages": "Cannot fork: no messages in conversation",
       "commandNoAssistantUuid": "Cannot fork: no assistant response with identifiers"
-    }
-  },
-  "collab": {
-    "surfaceGroupLabel": "Sidebar view",
-    "sessionsSurfaceLabel": "Sessions",
-    "commands": {
-      "open": "Open Collab",
-      "createProject": "Create Collab project",
-      "joinProject": "Join Collab project",
-      "resumeSetup": "Resume Collab project setup"
     },
-    "notices": {
-      "desktopRequired": "Collab requires a local desktop vault.",
-      "createRequiresGit": "Native Git setup is required before creating a Collab project.",
-      "joinRequiresGit": "Native Git setup is required before joining a Collab project.",
-      "initializationFailed": "Collab could not initialize. Open Collab for recovery options.",
-      "setupReady": "Collab project \"{name}\" is ready.",
-      "setupNeedsAttention": "Collab project setup still needs attention.",
-      "noInterruptedSetup": "No interrupted Collab project setup was found.",
-      "projectFilesAvailable": "Project files are available in {path}.",
-      "conflictUnavailable": "Collab conflict resolution is unavailable.",
-      "reviewUnavailable": "Collab request review is unavailable."
+    "quote": {
+      "buttonLabel": "Quote"
     },
-    "surfaceLabel": "Collab",
-    "gitSetup": {
-      "title": "Native Git required",
-      "ready": "Native Git {version} is ready.",
-      "missing": "Install Native Git 2.38 or newer to use Collab.",
-      "incompatible": "This Git installation does not meet Collab requirements.",
-      "officialGuide": "Open official Git installation guide",
-      "agentPrompt": "Agent install prompt",
-      "copyPrompt": "Copy prompt",
-      "rescan": "Rescan",
-      "manualPath": "Advanced Git path",
-      "savePath": "Save path"
+    "sideChat": {
+      "title": "Side chat",
+      "collapse": "Collapse",
+      "discard": "Discard",
+      "statusPreparing": "Preparing",
+      "statusQueued": "{count} queued",
+      "statusWorking": "Working",
+      "statusError": "Needs attention",
+      "statusActionRequired": "Needs input",
+      "placeholder": "Ask a follow-up in the side chat",
+      "composerLabel": "Side chat message",
+      "needsPrompt": "Add a prompt after /side to start a side chat.",
+      "unsupportedProvider": "Side chat is not supported by this provider.",
+      "unavailableBusy": "Side chat needs a completed reply. Wait for the current turn to finish.",
+      "unavailableNoCheckpoint": "Side chat needs a completed reply in this conversation first.",
+      "unavailableNoSession": "Side chat could not resolve this conversation's provider session.",
+      "alreadyExists": "A side chat already exists for this conversation. Discard it to start another.",
+      "nestedUnavailable": "Side chat cannot start another side chat. Collapse to Main first.",
+      "mainOnlyCommand": "/{command} is available in the main chat only.",
+      "startFailed": "Side chat could not start: {error}",
+      "queued": "Queued for the side chat.",
+      "busySide": "The side chat is still responding. Wait for it to finish."
     },
-    "createProject": {
-      "title": "Create Collab project",
-      "projectName": "Project name",
-      "projectNamePlaceholder": "Research notes",
-      "memberName": "Your display name",
-      "memberNamePlaceholder": "Alice",
-      "create": "Create project",
-      "creating": "Creating project...",
-      "createFailed": "Could not create the project.",
-      "resumeRequired": "The project authority was saved, but setup is incomplete.",
-      "resume": "Resume setup",
-      "resumeFailed": "Setup still needs attention. Try Resume setup again."
-    },
-    "joinProject": {
-      "title": "Join Collab project",
-      "invitation": "Invitation",
-      "invitationPlaceholder": "Paste the invitation string",
-      "memberName": "Your display name",
-      "memberNamePlaceholder": "Alice",
-      "join": "Join project",
-      "joining": "Joining project...",
-      "joinFailed": "Could not join the project.",
-      "resumeRequired": "Your membership was saved, but setup is incomplete.",
-      "resume": "Resume joining",
-      "resumeFailed": "Joining still needs attention. Try again."
-    },
-    "reconnectProject": {
-      "title": "Reconnect project",
-      "description": "Paste a fresh invitation from the Host to reconnect {name}.",
-      "invitation": "Invitation",
-      "invitationPlaceholder": "Paste the new invitation string",
-      "reconnect": "Reconnect",
-      "reconnecting": "Reconnecting project...",
-      "failed": "Could not reconnect the project. Check the invitation and try again."
-    },
-    "panel": {
-      "title": "Collab",
-      "addProject": "Add project",
-      "createProject": "Create",
-      "projectPicker": "Select project",
-      "emptyDescription": "Create a local project or join one from another Claudian user.",
-      "joinProject": "Join",
-      "reconnectProject": "Reconnect project...",
-      "joinUnavailable": "Joining becomes available with LAN collaboration.",
-      "openProject": "Open project",
-      "setupIncomplete": "Project setup is incomplete, but its saved authority is safe.",
-      "workingCopyMissing": "The working copy is missing. The saved project was not deleted.",
-      "myChanges": "My changes",
-      "myChangesReady": "This project is ready. Change publishing arrives in the next milestone.",
-      "membersAccess": "Members & access",
-      "lanHost": "LAN Host",
-      "startHost": "Start LAN Host",
-      "stopHost": "Stop Host",
-      "createInvitation": "Create invitation",
-      "invitation": "Invitation string",
-      "hostUnavailable": "Only the project Host can start LAN sharing.",
-      "hostRunning": "Host running",
-      "hostStopped": "Host stopped",
-      "offline": "Offline",
-      "manager": "Manager",
-      "member": "Member",
-      "loading": "Loading Collab...",
-      "loadFailed": "Collab needs attention before it can continue.",
-      "retry": "Retry"
-    },
-  "projectManagement": {
-    "title": "Project management"
-  },
-  "retired": {
-    "title": "Retired",
-    "ended": "Collaboration ended on {date}.",
-    "unknownDate": "an unknown date",
-    "files": "Your current files are still in {path}.",
-    "keepFiles": "Keep files",
-    "deleteFiles": "Delete files",
-    "retryCleanup": "Retry cleanup",
-    "finishingCleanup": "Finishing local cleanup…",
-    "cleanupFailed": "Project cleanup needs attention. Retry when ready."
-  },
-  "access": {
-      "memberCount": "{count} members",
-      "noMembers": "No members are available.",
-      "loading": "Loading members…",
-      "loadFailed": "Members could not be loaded.",
-      "retry": "Retry",
-      "invitations": "Invitations",
-      "createInvitation": "Create invitation",
-      "creatingInvitation": "Creating invitation…",
-      "invitation": "Invitation string",
-      "copyInvitation": "Copy invitation",
-      "revokeInvitation": "Revoke invitation",
-      "invitationCopied": "Invitation copied.",
-      "invitationRevoked": "Invitation revoked.",
-      "invitationFailed": "The invitation action could not be completed.",
-      "copyFailed": "The invitation could not be copied.",
-      "manager": "Manager",
-      "managerCount": "Managers: {count}",
-      "host": "Host",
-      "you": "You",
-      "status": {
-        "active": "Active",
-        "pending": "Pending",
-        "revoked": "Removed",
-        "left": "Left"
-      },
-    "makeManager": "Make Manager",
-    "makeMember": "Make Member",
-    "completePromotion": "Complete promotion",
-    "promotionPending": "Waiting for acknowledgement",
-    "cancelPromotion": "Cancel promotion",
-    "cancelManagerSuccession": "Cancel successor selection",
-    "transferHost": "Transfer Host",
-    "acceptHost": "Accept Host",
-    "decline": "Decline",
-    "cancelTransfer": "Cancel transfer",
-    "managerSuccessorRequired": "Choose a successor before leaving.",
-    "lastManagerRequired": "At least one Manager must remain.",
-    "chooseManagerSuccessor": "Choose a successor to receive Manager responsibility.",
-    "waitingForManagerAcknowledgement": "Waiting for {name} to acknowledge Manager responsibility.",
-    "managerSuccessorAcknowledged": "The successor acknowledged. You can now leave.",
-    "hostTransferRequired": "Transfer Host before leaving.",
-      "removeMember": "Remove",
-    "leaveProject": "Leave project",
-    "retireProject": "Retire project",
-      "hostRemovalBlocked": "The LAN Host membership cannot be removed.",
-      "confirmPromote": "Make {name} a Manager? You will both remain Managers.",
-      "confirmDemote": "Make {name} a Member?",
-      "demoteHostUnchanged": "This changes their role only. If they are the LAN Host, Host responsibility stays with them.",
-      "confirmRemove": "Remove {name} from collaboration?",
-    "confirmLeave": "Leave this collaboration?",
-    "confirmRetire": "Retire this project for everyone?",
-      "removedFilesRetained": "Their local Project files and history stay on their device.",
-    "leaveCleanupWarning": "Choose what happens to this local copy. Git history and unpublished Git-only work cannot be recovered after cleanup.",
-    "retireWarning": "This ends collaboration for every Member. Visible files remain on each device, but collaboration history and Git-only work are not recoverable.",
-      "confirm": "Confirm",
-      "actionFailed": "The access change could not be completed. You can retry safely.",
-      "actionComplete": "Access updated."
-    },
-    "host": {
-      "summary": "LAN Host",
-      "hostedHere": "Hosted on this device",
-      "hostedElsewhere": "Hosted on another device",
-      "legacyClaimConfirmation": "Use this device as the Host owner?",
-      "legacyClaimAction": "Use this device",
-      "status": {
-        "stopped": "Stopped",
-        "starting": "Starting",
-        "running": "Running",
-        "stopping": "Stopping",
-        "needsAttention": "Needs attention"
-      },
-      "start": "Start Host",
-      "starting": "Starting Host…",
-      "stop": "Stop Host",
-      "stopping": "Stopping Host…",
-      "diagnostics": "Diagnostics",
-      "copyDiagnostics": "Copy diagnostics",
-      "diagnosticsCopied": "Diagnostics copied.",
-      "diagnosticsCopyFailed": "Diagnostics could not be copied.",
-      "retry": "Retry",
-      "startFailed": "Host could not be started. Check diagnostics and retry.",
-      "stopFailed": "Host could not be stopped cleanly. Check diagnostics and retry."
-    },
-    "publish": {
-      "title": "My changes",
-      "loading": "Checking changes…",
-      "updateAvailable": "Update available",
-      "clean": "Up to date",
-      "changedFiles": "{count} changed files",
-      "action": "Publish",
-      "publishing": "Publishing…",
-      "offline": "Offline · changes saved locally",
-      "pushed": "Changes sent to Host",
-      "awaitingRequest": "Request sync pending",
-      "conflict": "Conflict needs review",
-      "cancelled": "Publishing cancelled",
-      "error": "Publish needs attention",
-      "description": "Description",
-      "descriptionRequired": "Add a description before publishing.",
-      "descriptionPlaceholder": "Describe this review point. Use #171 to reference a Ticket or Fixes #171 to resolve it.",
-      "saveDescription": "Save description",
-      "savingDescription": "Saving description…",
-      "descriptionSaved": "Description saved.",
-      "descriptionNotSynced": "Local draft — not synced.",
-      "descriptionSaveFailed": "Could not save the description.",
-      "references": "References",
-      "resolves": "Resolves",
-      "fileKind": {
-        "added": "Added",
-        "modified": "Modified",
-        "deleted": "Deleted",
-        "renamed": "Renamed",
-        "copied": "Copied",
-        "typeChanged": "Changed"
-      }
-    },
-    "review": {
-      "title": "Review changes",
-      "publicationTitle": "Review before publishing",
-      "reviewAndPublish": "Review and publish",
-      "confirmPublish": "Confirm and publish",
-      "confirmingPublish": "Publishing…",
-      "confirmPublishFailed": "Could not publish changes",
-      "readyToPublish": "Ready to publish",
-      "openRequest": "Open a team change to review it.",
-      "loading": "Loading review…",
-      "loadFailed": "This review changed or could not be loaded. Open it again.",
-      "fileCount": "{count} changed files",
-      "sections": "Review sections",
-      "overview": "Overview",
-      "changes": "Changes ({count})",
-      "scope": "Files",
-      "currentFile": "Current file",
-      "allFiles": "All files",
-      "openFile": "Open this file",
-      "layout": "Diff layout",
-      "unified": "Unified",
-      "split": "Side by side",
-      "clean": "Ready to accept",
-      "conflicting": "Conflicts need resolution",
-      "stale": "Newer changes were published",
-      "noFiles": "No changed files",
-      "loadingFile": "Loading file…",
-      "accept": "Accept changes",
-      "acceptRequiresSync": "Reconnect and synchronize with the Host before accepting.",
-      "largeText": "This text file is too large for line-by-line review.",
-      "binary": "Binary file",
-      "fileSize": "Before: {oldSize} · After: {newSize}",
-      "fileLoadFailed": "Could not load this file for review.",
-      "accepting": "Accepting…",
-      "accepted": "Changes accepted",
-      "acceptFailed": "Could not accept changes"
-    },
-    "tickets": {
-      "editorTitle": "Ticket",
-      "sectionTitle": "Tickets",
-      "open": "Open",
-      "closed": "Closed",
-      "add": "Add Ticket",
-      "loading": "Loading Tickets…",
-      "loadMore": "Load more",
-      "loadFailed": "Tickets could not be loaded.",
-      "offlineReadOnly": "Offline · showing saved Tickets read-only",
-      "offlineCreateUnavailable": "Reconnect to create a Ticket.",
-      "offlineCacheUnavailable": "No saved Tickets are available offline.",
-      "empty": "No Tickets",
-      "createTitle": "Create Ticket",
-      "create": "Create Ticket",
-      "title": "Title",
-      "body": "Description",
-      "save": "Save",
-      "saving": "Saving…",
-      "saveFailed": "The Ticket could not be saved.",
-      "close": "Close",
-      "reopen": "Reopen",
-      "acceptedChanges": "Accepted changes",
-      "noAcceptedChanges": "No accepted changes reference this Ticket.",
-      "resolvedBy": "Resolved by",
-      "referencedBy": "Referenced by",
-      "activity": "Activity ({count})",
-      "comments": "Comments ({count})",
-      "addComment": "Add a comment",
-      "comment": "Comment"
-    },
-    "conflict": {
-      "title": "View conflicts",
-      "requestTitle": "Request conflict",
-      "myChangesTitle": "My changes conflict",
-      "fileCount": "{count} conflicted files",
-      "editAndPublish": "Edit the project files, then publish again.",
-      "loading": "Loading conflicts…",
-      "loadFailed": "These conflicts could not be loaded. Try again.",
-      "loadingFile": "Loading file versions…",
-      "fileLoadFailed": "This file could not be loaded.",
-      "kind": {
-        "text": "Text conflict",
-        "binary": "Binary file",
-        "deleteModify": "Deleted on one side",
-        "renameDelete": "Renamed on one side",
-        "directoryFile": "File and folder collision",
-        "portability": "Filename collision"
-      },
-      "mine": "Mine",
-      "accepted": "Accepted version",
-      "deleted": "Deleted",
-      "sideSummary": "{path} · {size}",
-      "blocking": "This collision cannot be resolved automatically. Rename the affected file outside Collab, then try again.",
-      "reload": "Reload conflicts"
-    },
-    "team": {
-      "title": "Team changes",
-      "loading": "Loading change requests…",
-      "loadFailed": "Could not load change requests.",
-      "retry": "Retry",
-      "stale": "Showing saved change requests · Offline",
-      "empty": "No open changes",
-      "unknownMember": "Unknown member",
-      "ownMember": "You",
-      "comments": "{count} comments"
-    },
-    "comments": {
-      "title": "Comments ({count})",
-      "empty": "No comments yet",
-      "input": "Add a comment",
-      "placeholder": "Add context or feedback…",
-      "required": "Enter a comment.",
-      "tooLarge": "Comment is too large.",
-      "submitFailed": "Could not add comment.",
-      "submit": "Comment",
-      "submitting": "Adding…",
-      "retry": "Retry comment",
-      "outdated": "Outdated"
+    "zen": {
+      "regionLabel": "Claudian chat",
+      "showHistory": "Show conversation",
+      "working": "Working…",
+      "thinking": "Thinking…",
+      "interrupted": "Interrupted",
+      "workedFor": "Worked for {duration}",
+      "workedForResult": "Worked for {duration} · {result}",
+      "actionRequired": "Needs your input",
+      "error": "Error: {message}",
+      "toolRunning": "{tool} · running",
+      "toolCompleted": "{tool} · done",
+      "toolFailed": "{tool} · failed",
+      "toolBlocked": "{tool} · blocked"
     }
   },
   "settings": {
-    "title": "Claudian Settings",
     "tabs": {
       "general": "General",
-      "collab": "Collab",
       "providers": "Providers",
-      "claude": "Claude",
-      "codex": "Codex"
+      "skills": "Skills"
+    },
+    "providerSettings": {
+      "unavailable": "Provider settings are unavailable.",
+      "loadFailed": "Could not load provider settings: {message}"
     },
     "display": "Display",
     "conversations": "Conversations",
     "content": "Content",
     "input": "Input",
-    "setup": "Setup",
     "models": "Models",
     "experimental": "Experimental",
     "userName": {
@@ -451,7 +134,8 @@
     "titleModel": {
       "name": "Title generation model",
       "desc": "Model used for auto-generating conversation titles.",
-      "auto": "Auto (Haiku)"
+      "select": "Select a model",
+      "unavailableWarning": "Automatic titles are paused. Select an available title model."
     },
     "navMappings": {
       "name": "Vim-style navigation mappings",
@@ -471,73 +155,10 @@
     "newSessionHotkey": {
       "name": "Replace Current Conversation"
     },
-    "newTabHotkey": {
-      "name": "New"
-    },
-    "closeTabHotkey": {
-      "name": "Close Tab"
-    },
-    "slashCommands": {
-      "name": "Commands and Skills",
-      "desc": "Manage vault-level commands and skills stored in .claude/commands/ and .claude/skills/. Triggered by /name."
-    },
-    "hiddenSlashCommands": {
-      "name": "Hidden Commands and Skills",
-      "desc": "Hide specific commands and skills from the dropdown. Useful for hiding Claude Code entries that are not relevant to Claudian. Enter names without the leading slash, one per line.",
-      "placeholder": "commit\nbuild\ntest"
-    },
-    "mcpServers": {
-      "name": "MCP Servers",
-      "descBeforeCommand": "Claude Code manages MCP servers via its own CLI. Configure with ",
-      "descAfterCommand": " and they will be available in Claudian. ",
-      "learnMore": "Learn more"
-    },
-    "plugins": {
-      "name": "Claude Code Plugins",
-      "desc": "Manage Claude Code plugins discovered from ~/.claude/plugins. Enabled plugins are stored per vault in .claude/settings.json."
-    },
-    "subagents": {
-      "name": "Subagents",
-      "desc": "Manage vault-level subagents stored in .claude/agents/. Each Markdown file defines one custom agent.",
-      "noAgents": "No subagents configured. Click + to create one.",
-      "deleteConfirm": "Delete subagent \"{name}\"?",
-      "saveFailed": "Failed to save subagent: {message}",
-      "refreshFailed": "Failed to refresh subagents: {message}",
-      "deleteFailed": "Failed to delete subagent: {message}",
-      "renameCleanupFailed": "Warning: could not remove old file for \"{name}\"",
-      "created": "Subagent \"{name}\" created",
-      "updated": "Subagent \"{name}\" updated",
-      "deleted": "Subagent \"{name}\" deleted",
-      "duplicateName": "An agent named \"{name}\" already exists",
-      "descriptionRequired": "Description is required",
-      "promptRequired": "System prompt is required",
-      "modal": {
-        "titleEdit": "Edit Subagent",
-        "titleAdd": "Add Subagent",
-        "name": "Name",
-        "nameDesc": "Lowercase letters, numbers, and hyphens only",
-        "namePlaceholder": "code-reviewer",
-        "description": "Description",
-        "descriptionDesc": "Brief description of this agent",
-        "descriptionPlaceholder": "Reviews code for bugs and style",
-        "advancedOptions": "Advanced options",
-        "model": "Model",
-        "modelDesc": "Model override for this agent",
-        "tools": "Tools",
-        "toolsDesc": "Comma-separated list of allowed tools (empty = all)",
-        "disallowedTools": "Disallowed tools",
-        "disallowedToolsDesc": "Comma-separated list of tools to disallow",
-        "skills": "Skills",
-        "skillsDesc": "Comma-separated list of skills",
-        "prompt": "System prompt",
-        "promptDesc": "Instructions for the agent",
-        "promptPlaceholder": "You are a code reviewer. Analyze the given code for..."
-      }
-    },
     "safety": "Safety",
     "loadUserSettings": {
-      "name": "Load user Claude settings",
-      "desc": "Load ~/.claude/settings.json. When enabled, user's Claude Code permission rules may bypass Safe mode."
+      "name": "Load user Claude Code settings",
+      "desc": "Load user-level Claude Code configuration from ~/.claude: settings.json, skills, commands, agents, and plugins. When disabled, only vault-level configuration is available. When enabled, user permission rules may bypass Safe mode."
     },
     "permissionDestination": {
       "name": "Save \"Always allow\" rules to",
@@ -545,24 +166,25 @@
       "localSettings": "Local settings",
       "projectSettings": "Project settings"
     },
-    "claudeSafeMode": {
-      "name": "Safe mode",
-      "desc": "Permission mode used when the Safe toggle is active."
-    },
     "codexSafeMode": {
       "name": "Safe mode",
       "desc": "Sandbox mode used when the Safe toggle is active."
     },
     "environment": "Environment",
+    "sharedEnvironment": {
+      "name": "Shared environment",
+      "desc": "Provider-neutral runtime variables shared across all providers. Use this for PATH, proxy, cert, and temp variables."
+    },
     "customVariables": {
       "name": "Custom variables",
-      "desc": "Environment variables for Claude SDK (KEY=VALUE format, one per line). Shell export prefix supported."
+      "desc": "Runtime variables owned by Claude Code only. Use this for ANTHROPIC_* and Claude Code-specific toggles."
     },
     "envSnippets": {
       "name": "Snippets",
       "addBtn": "Add snippet",
       "noSnippets": "No saved environment snippets yet. Click + to save your current environment configuration.",
       "nameRequired": "Please enter a name for the snippet",
+      "insert": "Insert",
       "modal": {
         "titleEdit": "Edit snippet",
         "titleSave": "Save snippet",
@@ -575,58 +197,30 @@
         "save": "Save",
         "update": "Update",
         "cancel": "Cancel"
-      }
+      },
+      "insertFailed": "Failed to insert snippet",
+      "deleteConfirm": "Delete environment snippet \"{name}\"?",
+      "deleteFailed": "Failed to delete snippet"
     },
     "customModelOverrides": {
       "name": "Custom model overrides",
       "desc": "Set model selector aliases and context window sizes for custom models."
     },
     "customModelAliases": {
-      "placeholder": "Alias"
+      "placeholder": "Alias",
+      "ariaLabel": "Alias for {model}",
+      "ariaDescription": "Custom label shown in the model selector. Leave empty to use the default."
     },
     "customContextLimits": {
-      "name": "Custom Context Limits",
-      "desc": "Set context window sizes for your custom models. Leave empty to use the default (200k tokens).",
       "invalid": "Invalid format. Use: 256k, 1m, or exact count (1000-10000000)."
-    },
-    "customModels": {
-      "name": "Custom models",
-      "desc": "Append additional Claude model IDs to the picker, one per line. Environment model overrides still replace the picker.",
-      "placeholder": "claude-opus-4-6\nclaude-opus-4-5-20251101"
     },
     "enableChrome": {
       "name": "Enable Chrome extension",
-      "desc": "Allow Claude to interact with Chrome via the claude-in-chrome extension. Requires the extension to be installed. Requires session restart."
+      "desc": "Allow Claude Code to interact with Chrome via the claude-in-chrome extension. Requires the extension to be installed. Requires session restart."
     },
     "maxWarmAgentProcesses": {
       "name": "Maximum concurrent running sessions",
       "desc": "Maximum number of agent sessions kept ready at once (5-10). Older idle sessions pause automatically and resume when used."
-    },
-    "collabGitInstallation": {
-      "summary": "Git setup help",
-      "requirement": "Claudian Collab uses Native Git 2.38 or newer installed on your computer.",
-      "verify": "Ask Claudian to check and verify your installation:",
-      "prompt": "Check my Git installation on this computer.\n1. Report whether Git is installed, the executable path, and the version.\n2. If Git is not installed, advise me how to install it on this device.\n3. Do not install or change anything."
-    },
-    "collabGitStatus": {
-      "checking": "Checking Git…",
-      "available": "Git executable detected",
-      "unavailable": "Git executable not found"
-    },
-    "collabReadMore": "Read more about Claudian Collab Mode",
-    "collabGitPath": {
-      "name": "Native Git path",
-      "desc": "Optional absolute path to Native Git for Collab. Leave empty to detect Git automatically.",
-      "placeholder": "Auto-detect Git"
-    },
-    "collabEnabled": {
-      "name": "Enable Collab",
-      "desc": "Enable local collaboration, Collab references, and the Agent Runtime for this Vault."
-    },
-    "collabProjectsFolder": {
-      "name": "Projects folder",
-      "desc": "Vault-relative folder for future Collab Projects. You do not need to create it first; Claudian creates or claims it on the next Create or Join. Existing Projects stay in place.",
-      "placeholder": "workspace"
     },
     "enableDualPane": {
       "name": "Enable dual-pane mode",
@@ -635,10 +229,6 @@
     "restoreTabsOnStartup": {
       "name": "Restore tabs on startup",
       "desc": "Reopen all tabs in single-pane mode or the last active tab in dual-pane mode."
-    },
-    "enableFilePane": {
-      "name": "Enable file pane",
-      "desc": "Show a Files tab in the dual-pane session manager."
     },
     "dualPaneSide": {
       "name": "Dual-pane side",
@@ -669,14 +259,31 @@
       "leftSidebar": "Left sidebar",
       "mainTab": "Main editor tab"
     },
+    "enableZenMode": {
+      "name": "Enable zen mode",
+      "desc": "Keep a minimal chat interface visible when the sidebar is hidden."
+    },
+    "cliInstallation": {
+      "disclosure": "{name} installation",
+      "description": "Optional CLI path for this computer. Leave empty to detect automatically.",
+      "checking": "Checking CLI…",
+      "versionUnavailable": "Version unavailable",
+      "notFound": "Not found",
+      "custom": "Custom path",
+      "auto": "Auto-detected",
+      "checkFailed": "Could not check CLI",
+      "saveFailed": "Could not save the path. Try again."
+    },
     "cliPath": {
-      "name": "Claude CLI path",
-      "desc": "Custom path to Claude Code CLI. Leave empty for auto-detection.",
-      "descWindows": "For the native installer, use claude.exe. For npm/pnpm/yarn or other package manager installs, use the cli-wrapper.cjs path (not claude.cmd).",
-      "descUnix": "Paste the output of \"which claude\" — works for both native and npm/pnpm/yarn installs.",
+      "name": "Claude Code CLI path",
+      "genericName": "CLI path",
       "validation": {
         "notExist": "Path does not exist",
-        "isDirectory": "Path is a directory, not a file"
+        "isDirectory": "Path is a directory, not a file",
+        "mustBeAbsolute": "Path must be absolute",
+        "notFile": "Path must point to a file",
+        "notAccessible": "Path is not accessible",
+        "notExecutable": "Path must be executable"
       }
     },
     "language": {
@@ -685,22 +292,57 @@
     },
     "providerEnablement": {
       "name": "Enable {provider}",
-      "desc": "Make enabled {provider} models available for new conversations. Existing sessions are preserved when disabled.",
       "lastProviderWarning": "At least one provider must remain enabled for Claudian to work.",
       "noModelsWarning": "No {provider} models are enabled. Go to Models below and enable at least one model."
+    },
+    "modelPicker": {
+      "name": "Visible models",
+      "desc": "Choose which models are available in the chat selector. Drag to reorder them; the provider uses the first currently usable model as its default. Select at least one model to use this provider.",
+      "browse": "Browse models",
+      "filterLabel": "Filter {provider} models",
+      "searchPlaceholder": "Filter by model, provider, or ID...",
+      "providerFilterLabel": "Filter model providers",
+      "allProviders": "All providers ({count})",
+      "discover": "Discover",
+      "visible": "Visible: ",
+      "ofDiscovered": " of {count} discovered",
+      "oneProvider": " | 1 provider",
+      "manyProviders": " | {count} providers",
+      "loadingModels": "Loading models...",
+      "loading": "Loading...",
+      "available": "{count} available",
+      "noneDiscovered": "No models discovered yet",
+      "selected": "Selected ({count})",
+      "clearAllLabel": "Clear all selected {provider} models",
+      "reorderLabel": "Reorder {model}; drag or use the Up and Down Arrow keys",
+      "default": "Default",
+      "unavailable": "Unavailable",
+      "unavailableTitle": "Configured model not currently reported by {provider}",
+      "aliasLabel": "Alias (optional)",
+      "removeLabel": "Remove {model}",
+      "noMatch": "No models match your filter.",
+      "emptyCatalog": "No {provider} models reported. Check your configuration and click Discover.",
+      "loadingCatalog": "Loading {provider} models…",
+      "stale": "{provider} model catalog is stale. Click Discover to refresh it."
+    },
+    "claude": {
+      "configuration": "Configuration",
+      "responseStyle": {
+        "name": "Response style",
+        "desc": "Default uses Claude Code’s normal style. Concise leads with results and skips preamble. Requires Claude Code 2.1.237 or later.",
+        "default": "Default",
+        "concise": "Concise"
+      }
     },
     "codex": {
       "installationMethod": {
         "name": "Installation method",
-        "desc": "How Claudian should launch Codex on Windows. Native Windows uses a Windows executable path. WSL launches the Linux CLI inside a selected distro.",
+        "desc": "How Claudian should launch Codex CLI on Windows. Native Windows uses a Windows executable path. WSL launches the Linux CLI inside a selected distro.",
         "nativeWindows": "Native Windows",
         "wsl": "WSL"
       },
       "cliPath": {
         "name": "Codex CLI path",
-        "descUnix": "Custom path to the local Codex CLI. Leave empty to prefer known Codex installs, then PATH.",
-        "descWindows": "Custom path to the local Codex CLI. Leave empty to auto-detect from PATH. Use the native Windows executable path, usually `codex.exe`.",
-        "descWsl": "Linux-side Codex command or absolute path to run inside WSL. Leave empty for PATH lookup inside the selected distro.",
         "validation": {
           "wslWindowsPath": "WSL mode expects a Linux command or Linux absolute path, not a Windows executable path."
         }
@@ -713,10 +355,11 @@
         "workspaceWrite": "Workspace write",
         "readOnly": "Read only"
       },
-      "customModels": {
-        "name": "Custom models",
-        "desc": "Append additional Codex model IDs to the picker, one per line. `OPENAI_MODEL` still takes precedence when set.",
-        "placeholder": "gpt-5.4\ngpt-5.3-codex-spark"
+      "responseStyle": {
+        "name": "Response style",
+        "desc": "Choose how Codex CLI communicates on supported models. Applies from the next message.",
+        "pragmatic": "Pragmatic",
+        "friendly": "Friendly"
       },
       "reasoningSummary": {
         "name": "Reasoning summary",
@@ -730,30 +373,12 @@
         "name": "Enable ultra effort",
         "desc": "Allow Ultra in the effort selector for Codex models that advertise support. Ultra uses maximum reasoning with automatic task delegation."
       },
-      "skills": {
-        "name": "Codex skills",
-        "desc": "Manage shared vault-level skills stored only in .agents/skills/.",
-        "hiddenName": "Hidden Skills",
-        "hiddenDesc": "Hide specific Codex skills from the dropdown. Enter skill names without the leading $, one per line.",
-        "hiddenPlaceholder": "analyze\nexplain\nfix"
-      },
-      "subagents": {
-        "name": "Codex subagents",
-        "desc": "Manage vault-level Codex subagents stored in .codex/agents/. Each TOML file defines one custom agent."
-      },
-      "mcp": {
-        "descBeforeCommand": "Codex manages MCP servers via its own CLI. Configure with ",
-        "descAfterCommand": " and they will be available in Claudian. ",
-        "learnMore": "Learn more"
-      },
       "environment": {
-        "name": "Codex environment",
-        "desc": "Codex-owned runtime variables only. Use this for OPENAI_* and CODEX_* settings. If Codex auto-detection needs help, add its install directory to shared PATH instead of this provider section."
+        "name": "Codex CLI environment",
+        "desc": "Runtime variables owned by Codex CLI only. Use this for OPENAI_* and CODEX_* settings. If Codex CLI auto-detection needs help, add its install directory to shared PATH instead of this provider section."
       }
     },
     "agentSkills": {
-      "sectionTitle": "Skills",
-      "fixedRoot": "Managed in .agents/skills",
       "sharedExpectation": "Manage shared skills in .agents/skills/ for compatible providers.",
       "noSkills": "No shared skills configured. Click + to create one.",
       "skillBadge": "skill",
@@ -768,9 +393,12 @@
       "created": "Shared skill \"{name}\" created.",
       "updated": "Shared skill \"{name}\" updated.",
       "deleted": "Shared skill \"{name}\" moved to trash.",
+      "fix": "Fix",
+      "fixed": "Skill \"{name}\" fixed.",
       "modal": {
         "titleEdit": "Edit Shared Skill",
         "titleAdd": "Add Shared Skill",
+        "titleFix": "Fix Skill",
         "name": "Skill name",
         "nameDesc": "Lowercase letters and numbers separated by single hyphens",
         "namePlaceholder": "code-reviewer",
@@ -787,75 +415,110 @@
         "confirm": "Move to trash"
       }
     },
-    "codexSkills": {
-      "modal": {
-        "titleEdit": "Edit Codex Skill",
-        "titleAdd": "Add Codex Skill",
-        "directory": "Directory",
-        "directoryDesc": "Where to store the skill",
-        "skillName": "Skill name",
-        "skillNameDesc": "The name used after $ (e.g., \"analyze\" for $analyze)",
-        "description": "Description",
-        "descriptionDesc": "Optional description shown in dropdown",
-        "instructions": "Instructions",
-        "instructionsDesc": "The skill instructions (SKILL.md content)",
-        "instructionsPlaceholder": "Analyze the code for..."
+    "opencode": {
+      "environment": {
+        "name": "OpenCode environment variables",
+        "desc": "Extra environment variables passed to OpenCode."
       },
-      "instructionsRequired": "Instructions are required",
-      "saveFailed": "Failed to save Codex skill",
-      "header": "Codex Skills",
-      "noSkills": "No Codex skills in vault. Click + to create one.",
-      "skillBadge": "skill",
-      "deleted": "Codex skill \"{name}\" deleted",
-      "deleteFailed": "Failed to delete Codex skill",
-      "created": "Codex skill \"{name}\" created",
-      "updated": "Codex skill \"{name}\" updated"
+      "migrationNotice": {
+        "text": "Claudian now supports OpenCode v2. OpenCode v1 support ends on October 30, 2026.",
+        "link": "Migrate to OpenCode v2"
+      }
     },
-    "codexSubagents": {
-      "modal": {
-        "titleEdit": "Edit Codex Subagent",
-        "titleAdd": "Add Codex Subagent",
-        "nameDesc": "Agent name Codex uses when spawning (lowercase, hyphens, underscores)",
-        "descriptionDesc": "When Codex should use this agent",
-        "modelDesc": "Model override (leave empty to inherit)",
-        "namePlaceholder": "code_reviewer"
+    "pi": {
+      "environment": {
+        "name": "Pi environment variables",
+        "desc": "Environment variables passed only to Pi."
+      }
+    },
+    "grok": {
+      "environment": {
+        "name": "Grok Build environment variables",
+        "desc": "Environment variables passed only to Grok Build. Custom-model secrets stay in this provider scope and are referenced from native config by env_key."
+      }
+    },
+    "skills": {
+      "subTabs": {
+        "claude": "Claude Code",
+        "shared": "Other providers"
       },
-      "reasoningEffort": {
-        "name": "Reasoning effort",
-        "desc": "Model reasoning effort level",
-        "inherit": "Inherit",
-        "low": "Low",
-        "medium": "Medium",
-        "high": "High",
-        "xhigh": "Extra High"
+      "claudeHelp": "Claude Code skills in .claude/skills/ and commands in .claude/commands/.",
+      "sharedHelp": "Shared skills in .agents/skills/ for Codex CLI, OpenCode, Pi and Grok Build.",
+      "status": {
+        "error": "Could not read the skill folders: {message}"
       },
-      "sandboxMode": {
-        "name": "Sandbox mode",
-        "desc": "Sandbox restriction for this agent",
-        "inherit": "Inherit",
-        "readOnly": "Read only",
-        "dangerFullAccess": "Danger full access",
-        "workspaceWrite": "Workspace write"
+      "synced": "Synced",
+      "actions": {
+        "sync": "Sync",
+        "resync": "Resync"
       },
-      "nicknameCandidates": {
-        "name": "Nickname candidates",
-        "desc": "Comma-separated display nicknames (e.g., atlas, delta, echo)"
+      "commands": {
+        "title": "Claude Code commands",
+        "hint": "Commands work only in Claude Code. Converting them to skills is recommended.",
+        "badge": "command",
+        "empty": "No commands in .claude/commands.",
+        "convert": "Convert to skill",
+        "editTitle": "Edit Command",
+        "convertTitle": "Convert Command to Skill",
+        "nameDesc": "Path under .claude/commands without .md; nested commands use /",
+        "descriptionDesc": "Optional description shown in the command menu",
+        "updated": "Command \"{name}\" updated.",
+        "converted": "Command converted to skill \"{name}\".",
+        "deleted": "Command \"{name}\" moved to trash.",
+        "deleteTitle": "Delete Command",
+        "deleteDescription": "The command file will be moved to trash.",
+        "collisionFailed": "A command named \"{name}\" already exists."
       },
-      "developerInstructions": {
-        "name": "Developer instructions",
-        "desc": "Core instructions that define the agent's behavior",
-        "placeholder": "Review code like an owner.\nPrioritize correctness, security, and missing test coverage.",
-        "required": "Developer instructions are required"
+      "droppedFrontmatterWarning": "Saving keeps only name and description. These keys will be removed and provider behavior may change: {keys}",
+      "hidden": {
+        "name": "Hidden commands and skills",
+        "desc": "Hide commands and skills from every provider's command menu. Enter exact names without the leading slash, one per line (Pi skills use skill:name).",
+        "placeholder": "commit\ncompact\nskill:review"
       },
-      "validation": {
-        "nameRequired": "Subagent name is required",
-        "nameTooLong": "Subagent name must be {count} characters or fewer",
-        "nameInvalid": "Subagent name can only contain lowercase letters, numbers, hyphens, and underscores",
-        "nicknameInvalid": "Nickname candidates can only contain ASCII letters, numbers, spaces, hyphens, and underscores",
-        "nicknameDuplicate": "Nickname candidates must be unique"
-      },
-      "header": "Codex Subagents",
-      "noAgents": "No Codex subagents in vault. Click + to create one."
+      "sync": {
+        "title": "Sync Skills",
+        "repairTitle": "Repair Skills Link",
+        "loading": "Checking skill folders...",
+        "intro": "Sync merges Claude Code's skills and commands into .agents/skills and links .claude/skills to it.",
+        "pros": {
+          "oneList": "One list for every provider.",
+          "newSkills": "New skills appear everywhere."
+        },
+        "cons": {
+          "dropped": "Only name and description are kept; provider-specific settings are dropped and behavior may change.",
+          "claudeSyntax": "Claude Code-only syntax won't work in other providers: {names}"
+        },
+        "attentionTitle": "Needs attention",
+        "nothingNeedsAttention": "Nothing needs attention.",
+        "nameField": "Name",
+        "descriptionField": "Description",
+        "ready": "Ready",
+        "problems": {
+          "name": "Invalid name. Use lowercase letters, numbers and hyphens.",
+          "description": "Missing description.",
+          "instructions": "No instructions. Add them to the file and sync again.",
+          "unreadable": "Its frontmatter can't be read. Fix the file and sync again.",
+          "sharedConflict": "A shared skill named \"{name}\" already exists.",
+          "itemConflict": "Another item is also named \"{name}\"."
+        },
+        "options": {
+          "fix": "Fix",
+          "replace": "Replace shared skill",
+          "discard": "Discard (move to trash)",
+          "keep": "Keep as command"
+        },
+        "continue": "Continue",
+        "confirmTitle": "Replace .claude/skills with a link?",
+        "confirmBody": ".claude/skills will be replaced by a link to .agents/skills. This can't be undone.",
+        "repairBody": ".claude/skills will be replaced by a link to .agents/skills. The folder it points to now is not changed.",
+        "linkBody": "Creates .claude/skills as a link to .agents/skills so Claude Code uses the shared skills. No files move.",
+        "linkWithItemsBody": "Commands become skills, then .claude/skills is created as a link to .agents/skills. This can't be undone.",
+        "devicesWarning": "Syncing this vault across devices? The link may not sync; run Sync on each device.",
+        "confirm": "Sync and link",
+        "partial": "Sync stopped before linking. Fix the items below and run Sync again.",
+        "failed": "Sync failed: {message}",
+        "summary": "Moved {moved}, converted {converted}, trashed {trashed}, removed {unlinked} link(s)."
+      }
     }
   }
 }

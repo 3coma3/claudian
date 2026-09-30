@@ -44,7 +44,7 @@ export class PiSubprocess {
     });
     this.process.onError((error) => {
       this.closeError = error;
-      this.notifyClose(error);
+      this.#notifyClose(error);
     });
     this.process.onExit(({ code, signal }) => {
       const exitError = this.closeError ?? (
@@ -52,17 +52,17 @@ export class PiSubprocess {
           ? undefined
           : new Error(`Pi subprocess exited (${formatExit(code, signal)})`)
       );
-      this.notifyClose(exitError);
+      this.#notifyClose(exitError);
     });
   }
 
   get stdin(): Writable {
-    this.assertStarted();
+    this.#assertStarted();
     return this.process.stdin;
   }
 
   get stdout(): Readable {
-    this.assertStarted();
+    this.#assertStarted();
     return this.process.stdout;
   }
 
@@ -89,13 +89,13 @@ export class PiSubprocess {
     return this.process.shutdown();
   }
 
-  private assertStarted(): void {
+  #assertStarted(): void {
     if (!this.process.isStarted()) {
       throw new Error('Pi subprocess is not started');
     }
   }
 
-  private notifyClose(error?: Error): void {
+  #notifyClose(error?: Error): void {
     if (this.notifiedClose) return;
     this.notifiedClose = true;
     for (const listener of [...this.closeListeners]) {
@@ -109,12 +109,12 @@ export class PiSubprocess {
   }
 }
 
-function resolvePiProcessSpec(
+export function resolvePiProcessSpec(
   launchSpec: PiSubprocessLaunchSpec,
   enhancedPath: string,
 ): Pick<
   ConstructorParameters<typeof ManagedStdioProcess>[0],
-  'args' | 'command' | 'killProcessTree'
+  'args' | 'command' | 'directSpawn' | 'killProcessTree'
 > {
   const command = launchSpec.command.trim();
   if (process.platform !== 'win32') {
@@ -137,15 +137,10 @@ function resolvePiProcessSpec(
     return { args: launchSpec.args, command, killProcessTree: false };
   }
 
-  const nodeExecutable = findNodeExecutable(enhancedPath);
-  if (!nodeExecutable) {
-    throw new Error(
-      'Pi requires Node.js, but node.exe was not found on PATH. Install Node.js or configure a native Pi executable.',
-    );
-  }
   return {
     args: [nodeEntrypoint, ...launchSpec.args],
-    command: nodeExecutable,
+    command: findNodeExecutable(enhancedPath) ?? 'node',
+    directSpawn: true,
     killProcessTree: true,
   };
 }

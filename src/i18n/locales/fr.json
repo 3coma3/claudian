@@ -4,25 +4,16 @@
     "cancel": "Annuler",
     "delete": "Supprimer",
     "edit": "Modifier",
-    "preview": "Aperçu",
     "add": "Ajouter",
-    "remove": "Supprimer",
-    "clear": "Effacer",
     "clearAll": "Tout effacer",
-    "loading": "Chargement",
     "error": "Erreur",
-    "success": "Succès",
-    "warning": "Avertissement",
     "confirm": "Confirmer",
-    "settings": "Paramètres",
     "advanced": "Avancé",
-    "enabled": "Activé",
-    "disabled": "Désactivé",
-    "platform": "Plateforme",
-    "refresh": "Actualiser",
-    "rewind": "Rembobiner"
+    "refresh": "Actualiser"
   },
   "chat": {
+    "selectAvailableModel": "Sélectionnez un modèle disponible avant d’envoyer.",
+    "selectAvailableTitleModel": "Sélectionnez un modèle de titre disponible dans les paramètres de Claudian.",
     "rewind": {
       "confirmMessage": "Rembobiner jusqu'à ce point ? Les modifications de fichiers postérieures à ce message peuvent être écrasées ou supprimées. Cette action est irréversible.",
       "confirmMessageConflicts": "Rembobiner jusqu'à ce point ? {count} fichier(s) modifié(s) hors de l’agent seront écrasés :\n{files}",
@@ -51,376 +42,68 @@
       "failed": "Échec de la bifurcation : {error}",
       "unavailableStreaming": "Impossible de bifurquer pendant le streaming",
       "unavailableNoUuid": "Impossible de bifurquer : identifiants de message manquants",
-      "unavailableNoResponse": "Impossible de bifurquer : aucune réponse pour bifurquer",
       "errorMessageNotFound": "Message introuvable",
       "errorNoSession": "Aucun ID de session disponible",
       "errorNoActiveTab": "Aucun onglet actif",
       "commandNoMessages": "Impossible de bifurquer : aucun message dans la conversation",
       "commandNoAssistantUuid": "Impossible de bifurquer : aucune réponse de l’assistant avec des identifiants"
-    }
-  },
-  "collab": {
-    "surfaceGroupLabel": "Vue de la barre latérale",
-    "sessionsSurfaceLabel": "Sessions",
-    "commands": {
-      "open": "Ouvrir Collab",
-      "createProject": "Créer un projet Collab",
-      "joinProject": "Rejoindre un projet Collab",
-      "resumeSetup": "Reprendre la configuration du projet Collab"
     },
-    "notices": {
-      "desktopRequired": "Collab nécessite un vault local sur ordinateur.",
-      "createRequiresGit": "Native Git doit être configuré avant de créer un projet Collab.",
-      "joinRequiresGit": "Native Git doit être configuré avant de rejoindre un projet Collab.",
-      "initializationFailed": "Collab n’a pas pu démarrer. Ouvrez Collab pour afficher les options de récupération.",
-      "setupReady": "Le projet Collab « {name} » est prêt.",
-      "setupNeedsAttention": "La configuration du projet Collab nécessite encore votre attention.",
-      "noInterruptedSetup": "Aucune configuration interrompue de projet Collab n’a été trouvée.",
-      "projectFilesAvailable": "Les fichiers du projet sont disponibles dans {path}.",
-      "conflictUnavailable": "La résolution des conflits Collab n’est pas disponible.",
-      "reviewUnavailable": "La révision de la demande Collab n’est pas disponible."
+    "quote": {
+      "buttonLabel": "Citer"
     },
-    "surfaceLabel": "Collab",
-    "gitSetup": {
-      "title": "Git natif requis",
-      "ready": "Git natif {version} est prêt.",
-      "missing": "Installez Git natif 2.38 ou une version ultérieure pour utiliser Collab.",
-      "incompatible": "Cette installation de Git ne répond pas aux exigences de Collab.",
-      "officialGuide": "Ouvrir le guide d’installation officiel de Git",
-      "agentPrompt": "Prompt d’installation pour l’agent",
-      "copyPrompt": "Copier le prompt",
-      "rescan": "Rechercher à nouveau",
-      "manualPath": "Chemin Git avancé",
-      "savePath": "Enregistrer le chemin"
+    "sideChat": {
+      "title": "Conversation annexe",
+      "collapse": "Réduire",
+      "discard": "Abandonner",
+      "statusPreparing": "Préparation",
+      "statusQueued": "{count} en attente",
+      "statusWorking": "En cours",
+      "statusError": "Attention requise",
+      "statusActionRequired": "Saisie requise",
+      "placeholder": "Poser une question dans la conversation annexe",
+      "composerLabel": "Message de la conversation annexe",
+      "needsPrompt": "Ajoute une consigne après /side pour démarrer une conversation annexe.",
+      "unsupportedProvider": "Ce fournisseur ne prend pas en charge la conversation annexe.",
+      "unavailableBusy": "La conversation annexe exige une réponse terminée. Attends la fin du tour en cours.",
+      "unavailableNoCheckpoint": "Termine d'abord une réponse dans cette conversation.",
+      "unavailableNoSession": "Impossible de résoudre la session du fournisseur pour cette conversation.",
+      "alreadyExists": "Une conversation annexe existe déjà ici. Abandonne-la pour en démarrer une autre.",
+      "nestedUnavailable": "Une conversation annexe ne peut pas en démarrer une autre. Réduis d'abord vers la principale.",
+      "mainOnlyCommand": "/{command} n'est disponible que dans la conversation principale.",
+      "startFailed": "Impossible de démarrer la conversation annexe : {error}",
+      "queued": "Ajouté à la file de la discussion secondaire.",
+      "busySide": "La conversation annexe répond encore. Attends la fin."
     },
-    "createProject": {
-      "title": "Créer un projet Collab",
-      "projectName": "Nom du projet",
-      "projectNamePlaceholder": "Research notes",
-      "memberName": "Votre nom affiché",
-      "memberNamePlaceholder": "Alice",
-      "create": "Créer le projet",
-      "creating": "Création du projet...",
-      "createFailed": "Impossible de créer le projet.",
-      "resumeRequired": "Le projet a été enregistré, mais sa configuration est incomplète.",
-      "resume": "Reprendre la configuration",
-      "resumeFailed": "La configuration nécessite toujours votre attention. Réessayez."
-    },
-    "joinProject": {
-      "title": "Rejoindre un projet Collab",
-      "invitation": "Invitation",
-      "invitationPlaceholder": "Collez la chaîne d’invitation",
-      "memberName": "Votre nom d’affichage",
-      "memberNamePlaceholder": "Alice",
-      "join": "Rejoindre le projet",
-      "joining": "Connexion au projet...",
-      "joinFailed": "Impossible de rejoindre le projet.",
-      "resumeRequired": "Votre adhésion a été enregistrée, mais la configuration est incomplète.",
-      "resume": "Reprendre la connexion",
-      "resumeFailed": "La connexion nécessite encore votre attention. Réessayez."
-    },
-    "reconnectProject": {
-      "title": "Reconnecter le projet",
-      "description": "Collez une nouvelle invitation de l’Host pour reconnecter {name}.",
-      "invitation": "Invitation",
-      "invitationPlaceholder": "Collez la nouvelle chaîne d’invitation",
-      "reconnect": "Reconnecter",
-      "reconnecting": "Reconnexion du projet...",
-      "failed": "Impossible de reconnecter le projet. Vérifiez l’invitation et réessayez."
-    },
-    "panel": {
-      "title": "Collab",
-      "addProject": "Ajouter un projet",
-      "createProject": "Créer",
-      "projectPicker": "Sélectionner un projet",
-      "emptyDescription": "Créez un projet local ou rejoignez celui d’un autre utilisateur Claudian.",
-      "joinProject": "Rejoindre",
-      "reconnectProject": "Reconnecter le projet...",
-      "joinUnavailable": "La participation sera disponible avec la collaboration LAN.",
-      "openProject": "Ouvrir le projet",
-      "setupIncomplete": "La configuration est incomplète, mais l’authority enregistrée est sûre.",
-      "workingCopyMissing": "La copie de travail est absente. Le projet enregistré n’a pas été supprimé.",
-      "myChanges": "Mes modifications",
-      "myChangesReady": "Le projet est prêt. La publication arrivera au prochain jalon.",
-      "membersAccess": "Membres et accès",
-      "lanHost": "LAN Host",
-      "startHost": "Démarrer l’hôte LAN",
-      "stopHost": "Arrêter l’hôte",
-      "createInvitation": "Créer une invitation",
-      "invitation": "Chaîne d’invitation",
-      "hostUnavailable": "Seul l’hôte du projet peut démarrer le partage LAN.",
-      "hostRunning": "Hôte actif",
-      "hostStopped": "Host arrêté",
-      "offline": "Hors ligne",
-      "manager": "Manager",
-      "member": "Membre",
-      "loading": "Chargement de Collab...",
-      "loadFailed": "Collab nécessite votre attention avant de continuer.",
-      "retry": "Réessayer"
-    },
-    "projectManagement": {
-      "title": "Gestion du projet"
-    },
-    "access": {
-      "memberCount": "{count} membres",
-      "noMembers": "Aucun membre disponible.",
-      "loading": "Chargement des membres…",
-      "loadFailed": "Impossible de charger les membres.",
-      "retry": "Réessayer",
-      "invitations": "Invitations",
-      "createInvitation": "Créer une invitation",
-      "creatingInvitation": "Création de l’invitation…",
-      "invitation": "Chaîne d’invitation",
-      "copyInvitation": "Copier l’invitation",
-      "revokeInvitation": "Révoquer l’invitation",
-      "invitationCopied": "Invitation copiée.",
-      "invitationRevoked": "Invitation révoquée.",
-      "invitationFailed": "L’action sur l’invitation n’a pas pu aboutir.",
-      "copyFailed": "Impossible de copier l’invitation.",
-      "manager": "Manager",
-      "managerCount": "Managers : {count}",
-      "host": "Host",
-      "you": "Vous",
-      "status": {
-        "active": "Actif",
-        "pending": "En attente",
-        "revoked": "Retiré",
-        "left": "Parti"
-      },
-      "makeManager": "Nommer Manager",
-      "makeMember": "Rendre membre",
-      "completePromotion": "Terminer la promotion",
-      "promotionPending": "En attente de confirmation",
-      "cancelPromotion": "Annuler la promotion",
-      "cancelManagerSuccession": "Annuler le choix du successeur",
-      "removeMember": "Retirer",
-      "leaveProject": "Quitter le projet",
-      "hostRemovalBlocked": "L’adhésion du Host LAN ne peut pas être retirée.",
-      "confirmPromote": "Nommer {name} Manager ? Vous resterez tous les deux Managers.",
-      "confirmDemote": "Rendre {name} membre ?",
-      "demoteHostUnchanged": "Seul son rôle change. Si cette personne est le Host LAN, elle conserve la responsabilité de Host.",
-      "confirmRemove": "Retirer {name} de la collaboration ?",
-      "confirmLeave": "Quitter cette collaboration ?",
-      "removedFilesRetained": "Ses fichiers de projet locaux et son historique restent sur son appareil.",
-      "confirm": "Confirmer",
-      "actionFailed": "La modification d’accès n’a pas pu aboutir. Vous pouvez réessayer sans risque.",
-      "transferHost": "Transfer Host",
-      "acceptHost": "Accept Host",
-      "decline": "Decline",
-      "cancelTransfer": "Cancel transfer",
-      "managerSuccessorRequired": "Choose a successor before leaving.",
-      "lastManagerRequired": "Au moins un Manager doit rester.",
-      "chooseManagerSuccessor": "Choose a successor to receive Manager responsibility.",
-      "waitingForManagerAcknowledgement": "En attente de la confirmation de responsabilité Manager par {name}.",
-      "managerSuccessorAcknowledged": "Le successeur a confirmé. Vous pouvez maintenant quitter le projet.",
-      "hostTransferRequired": "Transfer Host before leaving.",
-      "retireProject": "Retire project",
-      "confirmRetire": "Retire this project for everyone?",
-      "leaveCleanupWarning": "Choose what happens to this local copy. Git history and unpublished Git-only work cannot be recovered after cleanup.",
-      "retireWarning": "This ends collaboration for every Member. Visible files remain on each device, but collaboration history and Git-only work are not recoverable.",
-      "actionComplete": "Accès mis à jour."
-    },
-    "host": {
-      "summary": "Host LAN",
-      "hostedHere": "Hébergé sur cet appareil",
-      "hostedElsewhere": "Hébergé sur un autre appareil",
-      "legacyClaimConfirmation": "Utiliser cet appareil comme propriétaire de l’hôte ?",
-      "legacyClaimAction": "Utiliser cet appareil",
-      "status": {
-        "stopped": "Arrêté",
-        "starting": "Démarrage",
-        "running": "En cours",
-        "stopping": "Arrêt",
-        "needsAttention": "Attention requise"
-      },
-      "start": "Démarrer le Host",
-      "starting": "Démarrage du Host…",
-      "stop": "Arrêter le Host",
-      "stopping": "Arrêt du Host…",
-      "diagnostics": "Diagnostic",
-      "copyDiagnostics": "Copy diagnostics",
-      "diagnosticsCopied": "Diagnostics copied.",
-      "diagnosticsCopyFailed": "Diagnostics could not be copied.",
-      "retry": "Réessayer",
-      "startFailed": "Impossible de démarrer le Host. Consultez le diagnostic et réessayez.",
-      "stopFailed": "Le Host n’a pas pu être arrêté correctement. Consultez le diagnostic et réessayez."
-    },
-    "publish": {
-      "title": "Mes modifications",
-      "loading": "Vérification des modifications…",
-      "updateAvailable": "Mise à jour disponible",
-      "clean": "À jour",
-      "changedFiles": "{count} fichiers modifiés",
-      "action": "Publier",
-      "publishing": "Publication…",
-      "offline": "Hors ligne · modifications enregistrées localement",
-      "pushed": "Modifications envoyées au Host",
-      "awaitingRequest": "Synchronisation de la demande en attente",
-      "conflict": "Le conflit doit être examiné",
-      "cancelled": "Publication annulée",
-      "error": "La publication nécessite votre attention",
-      "description": "Description",
-      "descriptionRequired": "Add a description before publishing.",
-      "descriptionPlaceholder": "Describe this review point. Use #171 to reference a Ticket or Fixes #171 to resolve it.",
-      "saveDescription": "Save description",
-      "savingDescription": "Saving description…",
-      "descriptionSaved": "Description saved.",
-      "descriptionNotSynced": "Local draft — not synced.",
-      "descriptionSaveFailed": "Could not save the description.",
-      "references": "References",
-      "resolves": "Resolves",
-      "fileKind": {
-        "added": "Ajouté",
-        "modified": "Modifié",
-        "deleted": "Supprimé",
-        "renamed": "Renommé",
-        "copied": "Copié",
-        "typeChanged": "Modifié"
-      }
-    },
-    "review": {
-      "title": "Examiner les modifications",
-      "publicationTitle": "Examiner avant publication",
-      "reviewAndPublish": "Examiner et publier",
-      "confirmPublish": "Confirmer et publier",
-      "confirmingPublish": "Publication…",
-      "confirmPublishFailed": "Impossible de publier les modifications",
-      "readyToPublish": "Prêt à publier",
-      "openRequest": "Ouvrez une modification d’équipe pour l’examiner.",
-      "loading": "Chargement de l’examen…",
-      "loadFailed": "Cette modification a changé ou n’a pas pu être chargée. Rouvrez-la.",
-      "fileCount": "{count} fichiers modifiés",
-      "sections": "Sections de revue",
-      "overview": "Vue d’ensemble",
-      "changes": "Modifications ({count})",
-      "scope": "Portée des fichiers",
-      "currentFile": "Fichier actuel",
-      "allFiles": "Tous les fichiers",
-      "openFile": "Ouvrir ce fichier",
-      "layout": "Disposition du diff",
-      "unified": "Unifié",
-      "split": "Côte à côte",
-      "clean": "Prêt à accepter",
-      "conflicting": "Des conflits doivent être résolus",
-      "stale": "Des modifications plus récentes ont été publiées",
-      "noFiles": "Aucun fichier modifié",
-      "loadingFile": "Chargement du fichier…",
-      "accept": "Accepter les modifications",
-      "acceptRequiresSync": "Reconnect and synchronize with the Host before accepting.",
-      "largeText": "Ce fichier texte est trop volumineux pour un examen ligne par ligne.",
-      "binary": "Fichier binaire",
-      "fileSize": "Avant : {oldSize} · Après : {newSize}",
-      "fileLoadFailed": "Impossible de charger ce fichier pour l’examen.",
-      "accepting": "Acceptation…",
-      "accepted": "Modifications acceptées",
-      "acceptFailed": "Impossible d’accepter les modifications"
-    },
-    "tickets": {
-      "editorTitle": "Ticket",
-      "sectionTitle": "Tickets",
-      "open": "Open",
-      "closed": "Closed",
-      "add": "Add Ticket",
-      "loading": "Loading Tickets…",
-      "loadMore": "Load more",
-      "offlineReadOnly": "Offline · showing saved Tickets read-only",
-      "offlineCreateUnavailable": "Reconnect to create a Ticket.",
-      "offlineCacheUnavailable": "No saved Tickets are available offline.",
-      "loadFailed": "Tickets could not be loaded.",
-      "empty": "No Tickets",
-      "createTitle": "Create Ticket",
-      "create": "Create Ticket",
-      "title": "Title",
-      "body": "Description",
-      "save": "Save",
-      "saving": "Saving…",
-      "saveFailed": "The Ticket could not be saved.",
-      "close": "Close",
-      "reopen": "Reopen",
-      "acceptedChanges": "Accepted changes",
-      "noAcceptedChanges": "No accepted changes reference this Ticket.",
-      "resolvedBy": "Resolved by",
-      "referencedBy": "Referenced by",
-      "activity": "Activité ({count})",
-      "comments": "Comments ({count})",
-      "addComment": "Add a comment",
-      "comment": "Comment"
-    },
-    "conflict": {
-      "title": "Afficher les conflits",
-      "requestTitle": "Conflit dans la demande",
-      "myChangesTitle": "Conflit dans mes modifications",
-      "fileCount": "{count} fichiers en conflit",
-      "editAndPublish": "Modifiez les fichiers du projet, puis publiez à nouveau.",
-      "loading": "Chargement des conflits…",
-      "loadFailed": "Impossible de charger ces conflits. Réessayez.",
-      "loadingFile": "Chargement des versions du fichier…",
-      "fileLoadFailed": "Impossible de charger ce fichier.",
-      "kind": {
-        "text": "Conflit de texte",
-        "binary": "Fichier binaire",
-        "deleteModify": "Supprimé d’un côté",
-        "renameDelete": "Renommé d’un côté",
-        "directoryFile": "Collision entre fichier et dossier",
-        "portability": "Collision de noms de fichiers"
-      },
-      "mine": "Ma version",
-      "accepted": "Version acceptée",
-      "deleted": "Supprimé",
-      "sideSummary": "{path} · {size}",
-      "blocking": "Cette collision ne peut pas être résolue automatiquement. Renommez le fichier concerné hors de Collab, puis réessayez.",
-      "reload": "Recharger les conflits"
-    },
-    "team": {
-      "title": "Modifications de l’équipe",
-      "loading": "Chargement des demandes de modification…",
-      "loadFailed": "Impossible de charger les demandes de modification.",
-      "retry": "Réessayer",
-      "stale": "Demandes enregistrées · Hors ligne",
-      "empty": "Aucune modification ouverte",
-      "unknownMember": "Membre inconnu",
-      "ownMember": "Vous",
-      "comments": "{count} commentaires"
-    },
-    "comments": {
-      "title": "Commentaires ({count})",
-      "empty": "Aucun commentaire",
-      "input": "Ajouter un commentaire",
-      "placeholder": "Ajoutez du contexte ou un retour…",
-      "required": "Saisissez un commentaire.",
-      "tooLarge": "Le commentaire est trop volumineux.",
-      "submitFailed": "Impossible d’ajouter le commentaire.",
-      "submit": "Commenter",
-      "submitting": "Ajout…",
-      "retry": "Réessayer le commentaire",
-      "outdated": "Obsolète"
-    },
-    "retired": {
-      "title": "Retired",
-      "ended": "Collaboration ended on {date}.",
-      "unknownDate": "an unknown date",
-      "files": "Your current files are still in {path}.",
-      "keepFiles": "Keep files",
-      "deleteFiles": "Delete files",
-      "retryCleanup": "Retry cleanup",
-      "finishingCleanup": "Finishing local cleanup…",
-      "cleanupFailed": "Project cleanup needs attention. Retry when ready."
+    "zen": {
+      "regionLabel": "Chat Claudian",
+      "showHistory": "Afficher la conversation",
+      "working": "En cours…",
+      "thinking": "Réflexion…",
+      "interrupted": "Interrompu",
+      "workedFor": "A travaillé pendant {duration}",
+      "workedForResult": "A travaillé pendant {duration} · {result}",
+      "actionRequired": "Votre réponse est requise",
+      "error": "Erreur : {message}",
+      "toolRunning": "{tool} · en cours",
+      "toolCompleted": "{tool} · terminé",
+      "toolFailed": "{tool} · échec",
+      "toolBlocked": "{tool} · bloqué"
     }
   },
   "settings": {
-    "title": "Paramètres Claudian",
     "tabs": {
       "general": "Général",
-      "collab": "Collaboration",
       "providers": "Fournisseurs",
-      "claude": "Claude",
-      "codex": "Codex"
+      "skills": "Skills"
+    },
+    "providerSettings": {
+      "unavailable": "Les réglages du fournisseur ne sont pas disponibles.",
+      "loadFailed": "Impossible de charger les réglages du fournisseur : {message}"
     },
     "display": "Affichage",
     "conversations": "Conversations",
     "content": "Contenu",
     "input": "Saisie",
-    "setup": "Configuration",
     "models": "Modèles",
     "experimental": "Expérimental",
     "userName": {
@@ -451,7 +134,8 @@
     "titleModel": {
       "name": "Modèle de génération de titre",
       "desc": "Modèle utilisé pour générer automatiquement les titres de conversation.",
-      "auto": "Automatique (Haiku)"
+      "select": "Sélectionner un modèle",
+      "unavailableWarning": "La génération automatique des titres est suspendue. Sélectionnez un modèle disponible pour les titres."
     },
     "navMappings": {
       "name": "Mappages de navigation style Vim",
@@ -471,73 +155,10 @@
     "newSessionHotkey": {
       "name": "Remplacer la conversation actuelle"
     },
-    "newTabHotkey": {
-      "name": "Nouveau"
-    },
-    "closeTabHotkey": {
-      "name": "Fermer l'onglet"
-    },
-    "slashCommands": {
-      "name": "Commandes et compétences",
-      "desc": "Gérez les commandes et compétences au niveau du vault stockées dans .claude/commands/ et .claude/skills/. Déclenchées par /nom."
-    },
-    "hiddenSlashCommands": {
-      "name": "Commandes et compétences masquées",
-      "desc": "Masquez des commandes et compétences spécifiques du menu déroulant. Utile pour masquer les entrées Claude Code qui ne sont pas pertinentes pour Claudian. Saisissez les noms sans le slash initial, un par ligne.",
-      "placeholder": "commit\nbuild\ntest"
-    },
-    "mcpServers": {
-      "name": "Serveurs MCP",
-      "descBeforeCommand": "Claude Code gère les serveurs MCP via sa propre CLI. Configurez-les avec ",
-      "descAfterCommand": " et ils seront disponibles dans Claudian. ",
-      "learnMore": "En savoir plus"
-    },
-    "plugins": {
-      "name": "Plugins Claude Code",
-      "desc": "Gérez les plugins Claude Code découverts dans ~/.claude/plugins. Les plugins activés sont stockés par vault dans .claude/settings.json."
-    },
-    "subagents": {
-      "name": "Sous-agents",
-      "desc": "Gérez les sous-agents au niveau du vault stockés dans .claude/agents/. Chaque fichier Markdown définit un agent personnalisé.",
-      "noAgents": "Aucun sous-agent configuré. Cliquez sur + pour en créer un.",
-      "deleteConfirm": "Supprimer le sous-agent \"{name}\" ?",
-      "saveFailed": "Échec de l’enregistrement du sous-agent : {message}",
-      "refreshFailed": "Échec de l’actualisation des subagents : {message}",
-      "deleteFailed": "Échec de la suppression du sous-agent : {message}",
-      "renameCleanupFailed": "Avertissement : impossible de supprimer l’ancien fichier pour \"{name}\"",
-      "created": "Sous-agent \"{name}\" créé",
-      "updated": "Sous-agent \"{name}\" mis à jour",
-      "deleted": "Sous-agent \"{name}\" supprimé",
-      "duplicateName": "Un agent nommé \"{name}\" existe déjà",
-      "descriptionRequired": "La description est obligatoire",
-      "promptRequired": "Le prompt système est obligatoire",
-      "modal": {
-        "titleEdit": "Modifier le sous-agent",
-        "titleAdd": "Ajouter un sous-agent",
-        "name": "Nom",
-        "nameDesc": "Lettres minuscules, chiffres et tirets uniquement",
-        "namePlaceholder": "code-reviewer",
-        "description": "Description",
-        "descriptionDesc": "Brève description de cet agent",
-        "descriptionPlaceholder": "Examine le code pour détecter les bugs et les problèmes de style",
-        "advancedOptions": "Options avancées",
-        "model": "Modèle",
-        "modelDesc": "Modèle à utiliser pour cet agent",
-        "tools": "Outils",
-        "toolsDesc": "Liste des outils autorisés, séparés par des virgules (vide = tous)",
-        "disallowedTools": "Outils non autorisés",
-        "disallowedToolsDesc": "Liste des outils à interdire, séparés par des virgules",
-        "skills": "Compétences",
-        "skillsDesc": "Liste des compétences, séparées par des virgules",
-        "prompt": "Prompt système",
-        "promptDesc": "Instructions pour l’agent",
-        "promptPlaceholder": "Vous êtes un relecteur de code. Analysez le code fourni pour..."
-      }
-    },
     "safety": "Sécurité",
     "loadUserSettings": {
-      "name": "Charger les paramètres utilisateur Claude",
-      "desc": "Charge ~/.claude/settings.json. Lorsqu'activé, les règles de permission de l'utilisateur peuvent contourner le mode sécurisé."
+      "name": "Charger les paramètres utilisateur de Claude Code",
+      "desc": "Charge la configuration Claude Code au niveau utilisateur depuis ~/.claude : settings.json, skills, commandes, agents et plugins. Lorsque désactivé, seule la configuration au niveau du coffre est disponible. Lorsqu'activé, les règles de permission de l'utilisateur peuvent contourner le mode sécurisé."
     },
     "permissionDestination": {
       "name": "Enregistrer les règles « Toujours autoriser » dans",
@@ -545,24 +166,25 @@
       "localSettings": "Paramètres locaux",
       "projectSettings": "Paramètres du projet"
     },
-    "claudeSafeMode": {
-      "name": "Mode sécurisé",
-      "desc": "Mode d'autorisation utilisé lorsque le bouton Safe est actif."
-    },
     "codexSafeMode": {
       "name": "Mode sécurisé",
       "desc": "Mode sandbox utilisé lorsque le bouton Safe est actif."
     },
     "environment": "Environnement",
+    "sharedEnvironment": {
+      "name": "Environnement partagé",
+      "desc": "Variables d'exécution indépendantes du fournisseur, partagées entre tous les fournisseurs. Utilisez ceci pour les variables PATH, de proxy, de certificats et de fichiers temporaires."
+    },
     "customVariables": {
       "name": "Variables personnalisées",
-      "desc": "Variables d'environnement pour Claude SDK (format KEY=VALUE, une par ligne). Préfixe export supporté."
+      "desc": "Variables d'exécution appartenant uniquement à Claude Code. Utilisez ceci pour ANTHROPIC_* et les options propres à Claude Code."
     },
     "envSnippets": {
       "name": "Extraits",
       "addBtn": "Ajouter un extrait",
       "noSnippets": "Aucun extrait d'environnement enregistré. Cliquez sur + pour sauvegarder votre configuration actuelle.",
       "nameRequired": "Veuillez entrer un nom pour l'extrait",
+      "insert": "Insérer",
       "modal": {
         "titleEdit": "Modifier l'extrait",
         "titleSave": "Sauvegarder l'extrait",
@@ -575,58 +197,30 @@
         "save": "Enregistrer",
         "update": "Mettre à jour",
         "cancel": "Annuler"
-      }
+      },
+      "insertFailed": "Impossible d'insérer le snippet",
+      "deleteConfirm": "Supprimer le snippet d'environnement « {name} » ?",
+      "deleteFailed": "Impossible de supprimer le snippet"
     },
     "customModelOverrides": {
       "name": "Remplacements de modèles personnalisés",
       "desc": "Définissez les alias dans le sélecteur de modèle et les tailles de fenêtre de contexte pour les modèles personnalisés."
     },
     "customModelAliases": {
-      "placeholder": "Alias"
+      "placeholder": "Alias",
+      "ariaLabel": "Alias pour {model}",
+      "ariaDescription": "Libellé personnalisé affiché dans le sélecteur de modèle. Laissez vide pour utiliser la valeur par défaut."
     },
     "customContextLimits": {
-      "name": "Limites de contexte personnalisées",
-      "desc": "Définissez les tailles de fenêtre de contexte pour vos modèles personnalisés. Laissez vide pour utiliser la valeur par défaut (200k tokens).",
       "invalid": "Format invalide. Utilisez : 256k, 1m ou nombre exact (1000-10000000)."
-    },
-    "customModels": {
-      "name": "Modèles personnalisés",
-      "desc": "Ajoutez des IDs de modèles Claude au sélecteur, un par ligne. Les remplacements de modèle par variables d'environnement remplacent toujours le sélecteur.",
-      "placeholder": "claude-opus-4-6\nclaude-opus-4-5-20251101"
     },
     "enableChrome": {
       "name": "Activer l'extension Chrome",
-      "desc": "Permettre à Claude d'interagir avec Chrome via l'extension claude-in-chrome. L'extension doit être installée. Nécessite un redémarrage de session."
+      "desc": "Permettre à Claude Code d'interagir avec Chrome via l'extension claude-in-chrome. L'extension doit être installée. Nécessite un redémarrage de session."
     },
     "maxWarmAgentProcesses": {
       "name": "Maximum de sessions exécutées simultanément",
       "desc": "Nombre maximal de sessions d'agent gardées prêtes à la fois (5-10). Les anciennes sessions inactives se mettent automatiquement en pause et reprennent à l'utilisation."
-    },
-    "collabGitInstallation": {
-      "summary": "Aide à la configuration de Git",
-      "requirement": "Claudian Collab utilise Native Git 2.38 ou une version ultérieure installée sur cet ordinateur.",
-      "verify": "Demandez à Claudian de vérifier votre installation :",
-      "prompt": "Vérifie l’installation de Git sur cet ordinateur.\n1. Indique si Git est installé, ainsi que le chemin de l’exécutable et sa version.\n2. Si Git n’est pas installé, conseille-moi sur la manière de l’installer sur cet appareil.\n3. N’installe et ne modifie rien."
-    },
-    "collabGitStatus": {
-      "checking": "Vérification de Git…",
-      "available": "Exécutable Git détecté",
-      "unavailable": "Exécutable Git introuvable"
-    },
-    "collabReadMore": "En savoir plus sur le mode Claudian Collab",
-    "collabGitPath": {
-      "name": "Chemin de Git natif",
-      "desc": "Chemin absolu facultatif vers Git natif pour Collab. Laissez vide pour détecter Git automatiquement.",
-      "placeholder": "Détecter Git automatiquement"
-    },
-    "collabEnabled": {
-      "name": "Activer Collab",
-      "desc": "Active la collaboration locale, les références Collab et l’Agent Runtime pour ce coffre."
-    },
-    "collabProjectsFolder": {
-      "name": "Dossier des projets",
-      "desc": "Dossier relatif au coffre pour les futurs projets Collab. Inutile de le créer à l’avance : Claudian le crée ou l’adopte lors de la prochaine création ou participation. Les projets existants restent en place.",
-      "placeholder": "workspace"
     },
     "enableDualPane": {
       "name": "Activer le mode double volet",
@@ -635,10 +229,6 @@
     "restoreTabsOnStartup": {
       "name": "Restaurer les onglets au démarrage",
       "desc": "Rouvrir tous les onglets en mode volet unique, ou uniquement le dernier onglet actif en mode double volet."
-    },
-    "enableFilePane": {
-      "name": "Activer le volet des fichiers",
-      "desc": "Afficher un onglet Fichiers dans le gestionnaire de sessions du mode double volet."
     },
     "dualPaneSide": {
       "name": "Côté du double volet",
@@ -669,14 +259,31 @@
       "leftSidebar": "Barre latérale gauche",
       "mainTab": "Onglet principal de l'éditeur"
     },
+    "enableZenMode": {
+      "name": "Activer le mode zen",
+      "desc": "Garde une interface de chat minimale visible lorsque la barre latérale est masquée."
+    },
+    "cliInstallation": {
+      "disclosure": "Installation de {name}",
+      "description": "Chemin CLI facultatif pour cet ordinateur. Laissez vide pour une détection automatique.",
+      "checking": "Vérification du CLI…",
+      "versionUnavailable": "Version indisponible",
+      "notFound": "Introuvable",
+      "custom": "Chemin personnalisé",
+      "auto": "Détecté automatiquement",
+      "checkFailed": "Impossible de vérifier le CLI",
+      "saveFailed": "Impossible d’enregistrer le chemin. Réessayez."
+    },
     "cliPath": {
-      "name": "Chemin CLI Claude",
-      "desc": "Chemin personnalisé vers Claude Code CLI. Laisser vide pour la détection automatique.",
-      "descWindows": "Pour l'installateur natif, utilisez claude.exe. Pour les installations npm/pnpm/yarn ou autres gestionnaires de paquets, utilisez le chemin cli-wrapper.cjs (pas claude.cmd).",
-      "descUnix": "Collez la sortie de \"which claude\" — fonctionne pour les installations natives et npm/pnpm/yarn.",
+      "name": "Chemin de la CLI Claude Code",
+      "genericName": "Chemin de la CLI",
       "validation": {
         "notExist": "Le chemin n'existe pas",
-        "isDirectory": "Le chemin est un répertoire, pas un fichier"
+        "isDirectory": "Le chemin est un répertoire, pas un fichier",
+        "mustBeAbsolute": "Le chemin doit être absolu",
+        "notFile": "Le chemin doit pointer vers un fichier",
+        "notAccessible": "Le chemin n'est pas accessible",
+        "notExecutable": "Le chemin doit être exécutable"
       }
     },
     "language": {
@@ -685,22 +292,57 @@
     },
     "providerEnablement": {
       "name": "Activer {provider}",
-      "desc": "Rendre les modèles {provider} activés disponibles pour les nouvelles conversations. Les sessions existantes sont conservées après la désactivation.",
       "lastProviderWarning": "Au moins un fournisseur doit rester activé pour que Claudian fonctionne.",
       "noModelsWarning": "Aucun modèle {provider} n’est activé. Dans la section Modèles ci-dessous, activez au moins un modèle."
+    },
+    "modelPicker": {
+      "name": "Modèles visibles",
+      "desc": "Choisissez les modèles disponibles dans le sélecteur du chat. Faites-les glisser pour les réordonner ; le fournisseur utilise le premier modèle actuellement utilisable comme modèle par défaut. Sélectionnez au moins un modèle pour utiliser ce fournisseur.",
+      "browse": "Parcourir les modèles",
+      "filterLabel": "Filtrer les modèles {provider}",
+      "searchPlaceholder": "Filtrer par modèle, fournisseur ou ID...",
+      "providerFilterLabel": "Filtrer les fournisseurs de modèles",
+      "allProviders": "Tous les fournisseurs ({count})",
+      "discover": "Découvrir",
+      "visible": "Visibles : ",
+      "ofDiscovered": " sur {count} découverts",
+      "oneProvider": " | 1 fournisseur",
+      "manyProviders": " | {count} fournisseurs",
+      "loadingModels": "Chargement des modèles...",
+      "loading": "Chargement...",
+      "available": "{count} disponible(s)",
+      "noneDiscovered": "Aucun modèle découvert pour l'instant",
+      "selected": "Sélectionnés ({count})",
+      "clearAllLabel": "Effacer tous les modèles {provider} sélectionnés",
+      "reorderLabel": "Réordonner {model} ; faites glisser ou utilisez les flèches Haut et Bas",
+      "default": "Par défaut",
+      "unavailable": "Indisponible",
+      "unavailableTitle": "Modèle configuré non signalé actuellement par {provider}",
+      "aliasLabel": "Alias (facultatif)",
+      "removeLabel": "Retirer {model}",
+      "noMatch": "Aucun modèle ne correspond à votre filtre.",
+      "emptyCatalog": "Aucun modèle {provider} signalé. Vérifiez votre configuration et cliquez sur Découvrir.",
+      "loadingCatalog": "Chargement des modèles {provider}…",
+      "stale": "Le catalogue de modèles {provider} est obsolète. Cliquez sur Découvrir pour l'actualiser."
+    },
+    "claude": {
+      "configuration": "Configuration",
+      "responseStyle": {
+        "name": "Style de réponse",
+        "desc": "Par défaut utilise le style habituel de Claude Code. Concis commence par les résultats et évite les préambules. Nécessite Claude Code 2.1.237 ou ultérieur.",
+        "default": "Par défaut",
+        "concise": "Concis"
+      }
     },
     "codex": {
       "installationMethod": {
         "name": "Méthode d’installation",
-        "desc": "Comment Claudian doit lancer Codex sous Windows. Windows natif utilise un chemin d’exécutable Windows. WSL lance la CLI Linux dans une distribution choisie.",
+        "desc": "Comment Claudian doit lancer Codex CLI sous Windows. Windows natif utilise un chemin d’exécutable Windows. WSL lance la CLI Linux dans une distribution choisie.",
         "nativeWindows": "Windows natif",
         "wsl": "WSL"
       },
       "cliPath": {
-        "name": "Chemin de la CLI Codex",
-        "descUnix": "Chemin personnalisé vers la CLI Codex locale. Laissez vide pour préférer les installations Codex connues, puis PATH.",
-        "descWindows": "Chemin personnalisé vers la CLI Codex locale. Laissez vide pour détecter via PATH. Utilisez le chemin de l’exécutable Windows natif, généralement `codex.exe`.",
-        "descWsl": "Commande Codex côté Linux ou chemin absolu à exécuter dans WSL. Laissez vide pour rechercher dans PATH dans la distribution choisie.",
+        "name": "Chemin de Codex CLI",
         "validation": {
           "wslWindowsPath": "Le mode WSL attend une commande Linux ou un chemin absolu Linux, pas un chemin d’exécutable Windows."
         }
@@ -713,10 +355,11 @@
         "workspaceWrite": "Écriture dans l’espace de travail",
         "readOnly": "Lecture seule"
       },
-      "customModels": {
-        "name": "Modèles personnalisés",
-        "desc": "Ajoutez des IDs de modèles Codex au sélecteur, un par ligne. `OPENAI_MODEL` reste prioritaire lorsqu’il est défini.",
-        "placeholder": "gpt-5.4\ngpt-5.3-codex-spark"
+      "responseStyle": {
+        "name": "Style de réponse",
+        "desc": "Choisissez le style de communication de Codex CLI sur les modèles compatibles. Ce choix s’applique dès le prochain message.",
+        "pragmatic": "Pragmatique",
+        "friendly": "Amical"
       },
       "reasoningSummary": {
         "name": "Résumé du raisonnement",
@@ -730,101 +373,152 @@
         "name": "Activer l’effort ultra",
         "desc": "Affiche Ultra dans le sélecteur d’effort pour les modèles Codex compatibles. Ultra utilise le raisonnement maximal avec délégation automatique des tâches."
       },
-      "skills": {
-        "name": "Compétences Codex",
-        "desc": "Manage shared vault-level skills stored only in .agents/skills/.",
-        "hiddenName": "Compétences masquées",
-        "hiddenDesc": "Masquez certaines compétences Codex dans le menu déroulant. Entrez les noms sans le $ initial, un par ligne.",
-        "hiddenPlaceholder": "analyze\nexplain\nfix"
-      },
-      "subagents": {
-        "name": "Sous-agents Codex",
-        "desc": "Gérez les sous-agents Codex de niveau vault stockés dans .codex/agents/. Chaque fichier TOML définit un agent personnalisé."
-      },
-      "mcp": {
-        "descBeforeCommand": "Codex gère les serveurs MCP via sa propre CLI. Configurez avec ",
-        "descAfterCommand": " et ils seront disponibles dans Claudian. ",
-        "learnMore": "En savoir plus"
-      },
       "environment": {
-        "name": "Environnement Codex",
-        "desc": "Variables d’exécution appartenant uniquement à Codex. Utilisez ceci pour les réglages OPENAI_* et CODEX_*. Si l’auto-détection de Codex a besoin d’aide, ajoutez son répertoire d’installation au PATH partagé plutôt qu’à cette section fournisseur."
+        "name": "Environnement Codex CLI",
+        "desc": "Variables d’exécution appartenant uniquement à Codex CLI. Utilisez ceci pour les réglages OPENAI_* et CODEX_*. Si l’auto-détection de Codex CLI a besoin d’aide, ajoutez son répertoire d’installation au PATH partagé plutôt qu’à cette section fournisseur."
       }
     },
     "agentSkills": {
-      "sectionTitle": "Skills", "fixedRoot": "Managed in .agents/skills", "sharedExpectation": "Manage shared skills in .agents/skills/ for compatible providers.", "noSkills": "No shared skills configured. Click + to create one.", "skillBadge": "skill", "diagnosticsTitle": "Skills needing attention", "loadFailed": "Could not load shared skills.", "savedRefreshFailed": "Saved, but provider refresh failed.", "validationFailed": "Invalid skill: {message}", "collisionFailed": "A skill named \"{name}\" already exists.", "saveFailed": "Failed to save shared skill: {message}", "deleteFailed": "Failed to move shared skill to trash: {message}", "staleConflict": "This skill changed elsewhere; refresh before saving.", "created": "Shared skill \"{name}\" created.", "updated": "Shared skill \"{name}\" updated.", "deleted": "Shared skill \"{name}\" moved to trash.",
-      "modal": { "titleEdit": "Edit Shared Skill", "titleAdd": "Add Shared Skill", "name": "Skill name", "nameDesc": "Lowercase letters and numbers separated by single hyphens", "namePlaceholder": "code-reviewer", "description": "Description", "descriptionDesc": "Required portable description used by providers to select the skill", "descriptionPlaceholder": "Reviews code for correctness and maintainability", "instructions": "Instructions", "instructionsDesc": "Required SKILL.md instructions", "instructionsPlaceholder": "Review the supplied code and report actionable findings..." },
-      "delete": { "title": "Delete Shared Skill", "description": "The entire skill folder, including scripts, references, and assets, will be moved to trash.", "confirm": "Move to trash" }
-    },
-    "codexSkills": {
+      "sharedExpectation": "Gérez les skills partagés dans .agents/skills/ pour les fournisseurs compatibles.",
+      "noSkills": "Aucun skill partagé configuré. Cliquez sur + pour en créer un.",
+      "skillBadge": "skill",
+      "diagnosticsTitle": "Skills à vérifier",
+      "loadFailed": "Impossible de charger les skills partagés.",
+      "savedRefreshFailed": "Enregistré, mais l'actualisation des fournisseurs a échoué.",
+      "validationFailed": "Skill invalide : {message}",
+      "collisionFailed": "Un skill nommé « {name} » existe déjà.",
+      "saveFailed": "Impossible d'enregistrer le skill partagé : {message}",
+      "deleteFailed": "Impossible de placer le skill partagé dans la corbeille : {message}",
+      "staleConflict": "Ce skill a été modifié ailleurs ; actualisez avant d'enregistrer.",
+      "created": "Skill partagé « {name} » créé.",
+      "updated": "Skill partagé « {name} » mis à jour.",
+      "deleted": "Skill partagé « {name} » placé dans la corbeille.",
+      "fix": "Corriger",
+      "fixed": "Skill « {name} » corrigé.",
       "modal": {
-        "titleEdit": "Modifier la compétence Codex",
-        "titleAdd": "Ajouter une compétence Codex",
-        "directory": "Répertoire",
-        "directoryDesc": "Où stocker la compétence",
-        "skillName": "Nom de la compétence",
-        "skillNameDesc": "Le nom utilisé après $ (par ex. \"analyze\" pour $analyze)",
+        "titleEdit": "Modifier le skill partagé",
+        "titleAdd": "Ajouter un skill partagé",
+        "titleFix": "Corriger le skill",
+        "name": "Nom du skill",
+        "nameDesc": "Lettres minuscules et chiffres séparés par des tirets simples",
+        "namePlaceholder": "code-reviewer",
         "description": "Description",
-        "descriptionDesc": "Description facultative affichée dans le menu déroulant",
+        "descriptionDesc": "Description portable obligatoire utilisée par les fournisseurs pour sélectionner le skill",
+        "descriptionPlaceholder": "Vérifie l'exactitude et la maintenabilité du code",
         "instructions": "Instructions",
-        "instructionsDesc": "Instructions de la compétence (contenu de SKILL.md)",
-        "instructionsPlaceholder": "Analyze the code for..."
+        "instructionsDesc": "Instructions SKILL.md obligatoires",
+        "instructionsPlaceholder": "Examine le code fourni et signale les problèmes exploitables..."
       },
-      "instructionsRequired": "Les instructions sont obligatoires",
-      "saveFailed": "Échec de l’enregistrement de la compétence Codex",
-      "header": "Compétences Codex",
-      "noSkills": "Aucune compétence Codex dans le vault. Cliquez sur + pour en créer une.",
-      "skillBadge": "compétence",
-      "deleted": "Compétence Codex \"{name}\" supprimée",
-      "deleteFailed": "Échec de la suppression de la compétence Codex",
-      "created": "Compétence Codex \"{name}\" créée",
-      "updated": "Compétence Codex \"{name}\" mise à jour"
+      "delete": {
+        "title": "Supprimer le skill partagé",
+        "description": "L'intégralité du dossier du skill, y compris les scripts, références et ressources, sera placée dans la corbeille.",
+        "confirm": "Placer dans la corbeille"
+      }
     },
-    "codexSubagents": {
-      "modal": {
-        "titleEdit": "Modifier le sous-agent Codex",
-        "titleAdd": "Ajouter un sous-agent Codex",
-        "nameDesc": "Nom d’agent utilisé par Codex au lancement (minuscules, traits d’union, underscores)",
-        "descriptionDesc": "Quand Codex doit utiliser cet agent",
-        "modelDesc": "Remplacement de modèle (vide = hériter)",
-        "namePlaceholder": "code_reviewer"
+    "opencode": {
+      "environment": {
+        "name": "Variables d'environnement OpenCode",
+        "desc": "Variables d'environnement supplémentaires transmises à OpenCode."
       },
-      "reasoningEffort": {
-        "name": "Effort de raisonnement",
-        "desc": "Niveau d’effort de raisonnement du modèle",
-        "inherit": "Hériter",
-        "low": "Faible",
-        "medium": "Moyen",
-        "high": "Élevé",
-        "xhigh": "Très élevé"
+      "migrationNotice": {
+        "text": "Claudian prend désormais en charge OpenCode v2. La prise en charge d'OpenCode v1 prend fin le 30 octobre 2026.",
+        "link": "Migrer vers OpenCode v2"
+      }
+    },
+    "pi": {
+      "environment": {
+        "name": "Variables d'environnement Pi",
+        "desc": "Variables d'environnement transmises uniquement à Pi."
+      }
+    },
+    "grok": {
+      "environment": {
+        "name": "Variables d'environnement Grok Build",
+        "desc": "Variables d'environnement transmises uniquement à Grok Build. Les secrets des modèles personnalisés restent dans la portée de ce fournisseur et sont référencés depuis la configuration native par env_key."
+      }
+    },
+    "skills": {
+      "subTabs": {
+        "claude": "Claude Code",
+        "shared": "Autres fournisseurs"
       },
-      "sandboxMode": {
-        "name": "Mode sandbox",
-        "desc": "Restriction sandbox pour cet agent",
-        "inherit": "Hériter",
-        "readOnly": "Lecture seule",
-        "dangerFullAccess": "Accès complet",
-        "workspaceWrite": "Écriture dans l’espace de travail"
+      "claudeHelp": "Skills Claude Code dans .claude/skills/ et commandes dans .claude/commands/.",
+      "sharedHelp": "Skills partagés dans .agents/skills/ pour Codex CLI, OpenCode, Pi et Grok Build.",
+      "status": {
+        "error": "Impossible de lire les dossiers de skills : {message}"
       },
-      "nicknameCandidates": {
-        "name": "Surnoms candidats",
-        "desc": "Surnoms d’affichage séparés par des virgules (ex. atlas, delta, echo)"
+      "synced": "Synchronisé",
+      "actions": {
+        "sync": "Synchroniser",
+        "resync": "Resynchroniser"
       },
-      "developerInstructions": {
-        "name": "Instructions développeur",
-        "desc": "Instructions centrales qui définissent le comportement de l’agent",
-        "placeholder": "Review code like an owner.\nPrioritize correctness, security, and missing test coverage.",
-        "required": "Les instructions développeur sont obligatoires"
+      "commands": {
+        "title": "Commandes Claude Code",
+        "hint": "Les commandes ne fonctionnent que dans Claude Code. Il est recommandé de les convertir en skills.",
+        "badge": "commande",
+        "empty": "Aucune commande dans .claude/commands.",
+        "convert": "Convertir en skill",
+        "editTitle": "Modifier la commande",
+        "convertTitle": "Convertir la commande en skill",
+        "nameDesc": "Chemin dans .claude/commands sans .md ; les commandes imbriquées utilisent /",
+        "descriptionDesc": "Description facultative affichée dans le menu des commandes",
+        "updated": "Commande « {name} » mise à jour.",
+        "converted": "Commande convertie en skill « {name} ».",
+        "deleted": "Commande « {name} » placée dans la corbeille.",
+        "deleteTitle": "Supprimer la commande",
+        "deleteDescription": "Le fichier de la commande sera placé dans la corbeille.",
+        "collisionFailed": "Une commande nommée « {name} » existe déjà."
       },
-      "validation": {
-        "nameRequired": "Le nom du sous-agent est obligatoire",
-        "nameTooLong": "Le nom du sous-agent doit contenir {count} caractères ou moins",
-        "nameInvalid": "Le nom du sous-agent ne peut contenir que des minuscules, chiffres, traits d’union et underscores",
-        "nicknameInvalid": "Les surnoms candidats ne peuvent contenir que des lettres ASCII, chiffres, espaces, traits d’union et underscores",
-        "nicknameDuplicate": "Les surnoms candidats doivent être uniques"
+      "droppedFrontmatterWarning": "L'enregistrement ne conserve que le nom et la description. Ces clés seront supprimées et le comportement des fournisseurs peut changer : {keys}",
+      "hidden": {
+        "name": "Commandes et skills masqués",
+        "desc": "Masque des commandes et des skills dans le menu de commandes de tous les fournisseurs. Saisissez les noms exacts sans barre oblique initiale, un par ligne (les skills Pi utilisent skill:nom).",
+        "placeholder": "commit\ncompact\nskill:review"
       },
-      "header": "Sous-agents Codex",
-      "noAgents": "Aucun sous-agent Codex dans le vault. Cliquez sur + pour en créer un."
+      "sync": {
+        "title": "Synchroniser les skills",
+        "repairTitle": "Réparer le lien des skills",
+        "loading": "Vérification des dossiers de skills...",
+        "intro": "La synchronisation regroupe les skills et commandes Claude Code dans .agents/skills et y relie .claude/skills.",
+        "pros": {
+          "oneList": "Une seule liste pour tous les fournisseurs.",
+          "newSkills": "Les nouveaux skills apparaissent partout."
+        },
+        "cons": {
+          "dropped": "Seuls le nom et la description sont conservés ; les réglages propres à chaque fournisseur sont supprimés et le comportement peut changer.",
+          "claudeSyntax": "La syntaxe propre à Claude Code ne fonctionne pas chez les autres fournisseurs : {names}"
+        },
+        "attentionTitle": "À vérifier",
+        "nothingNeedsAttention": "Rien à vérifier.",
+        "nameField": "Nom",
+        "descriptionField": "Description",
+        "ready": "Prêt",
+        "problems": {
+          "name": "Nom invalide. Utilisez des minuscules, des chiffres et des tirets.",
+          "description": "Description manquante.",
+          "instructions": "Aucune instruction. Ajoutez-les au fichier et resynchronisez.",
+          "unreadable": "Son frontmatter est illisible. Corrigez le fichier et resynchronisez.",
+          "sharedConflict": "Un skill partagé nommé « {name} » existe déjà.",
+          "itemConflict": "Un autre élément s'appelle aussi « {name} »."
+        },
+        "options": {
+          "fix": "Corriger",
+          "replace": "Remplacer le skill partagé",
+          "discard": "Abandonner (mettre à la corbeille)",
+          "keep": "Garder comme commande"
+        },
+        "continue": "Continuer",
+        "confirmTitle": "Remplacer .claude/skills par un lien ?",
+        "confirmBody": ".claude/skills sera remplacé par un lien vers .agents/skills. Cette action est irréversible.",
+        "repairBody": ".claude/skills sera remplacé par un lien vers .agents/skills. Le dossier vers lequel il pointe actuellement n'est pas modifié.",
+        "linkBody": "Crée .claude/skills comme lien vers .agents/skills pour que Claude Code utilise les skills partagés. Aucun fichier n'est déplacé.",
+        "linkWithItemsBody": "Les commandes deviennent des skills, puis .claude/skills est créé comme lien vers .agents/skills. Cette action est irréversible.",
+        "devicesWarning": "Ce coffre est synchronisé entre appareils ? Le lien risque de ne pas l'être ; synchronisez sur chaque appareil.",
+        "confirm": "Synchroniser et lier",
+        "partial": "La synchronisation s'est arrêtée avant la création du lien. Corrigez les éléments ci-dessous et relancez-la.",
+        "failed": "Échec de la synchronisation : {message}",
+        "summary": "Déplacés {moved}, convertis {converted}, à la corbeille {trashed}, {unlinked} lien(s) supprimé(s)."
+      }
     }
   }
 }

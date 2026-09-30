@@ -1,10 +1,16 @@
 import * as fs from 'node:fs/promises';
 
+import { copyProviderHistoryState } from '@/core/providers/providerHistory';
+
 import type {
   ProviderConversationHistoryService,
+  ProviderHistoryInput,
   ProviderHistoryPathContext,
+  ProviderHistoryResult,
+  ProviderHistoryState,
+  ProviderHistoryUpdate,
 } from '../../../core/providers/types';
-import type { Conversation } from '../../../core/types';
+import type { ChatMessage } from '../../../core/types';
 import { encodeCodexModelSelectionId } from '../modelSelection';
 import type { CodexProviderState } from '../types';
 import { getCodexState } from '../types';
@@ -19,21 +25,22 @@ import {
   deriveCodexSessionsRootFromSessionPath,
   findCodexSessionFileAsync,
   parseCodexSessionFileAsync,
-  parseCodexSessionModel,
+  parseCodexSessionRecords,
   parseCodexSessionTurns,
+  readCodexSessionModel,
 } from './CodexHistoryStore';
+import { hydrateCodexSubagentHistory } from './CodexSubagentHistory';
 
-async function readSessionTurns(sessionFilePath: string): Promise<CodexParsedTurn[]> {
+async function readSessionContent(sessionFilePath: string): Promise<string> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 10_000);
   try {
-    const content = await fs.readFile(sessionFilePath, {
+    return await fs.readFile(sessionFilePath, {
       encoding: 'utf-8',
       signal: controller.signal,
     });
-    return parseCodexSessionTurns(content);
   } catch {
-    return [];
+    return '';
   } finally {
     window.clearTimeout(timer);
   }
@@ -45,19 +52,15 @@ async function readSessionModel(
 ): Promise<string | null> {
   if (!sessionFilePath) return null;
   try {
-    return parseCodexSessionModel(
-      await fs.readFile(sessionFilePath, 'utf8'),
-      resumeAtTurnId,
-    );
+    return await readCodexSessionModel(sessionFilePath, resumeAtTurnId);
   } catch {
     return null;
   }
 }
 
 export class CodexConversationHistoryService implements ProviderConversationHistoryService {
-  private hydratedConversationPaths = new Map<string, string>();
 
-  hasConversationModelRecoverySource(conversation: Conversation): boolean {
+  hasConversationModelRecoverySource(conversation: ProviderHistoryInput): boolean {
     const state = getCodexState(conversation.providerState);
     return !!(
       state.threadId
@@ -69,7 +72,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
   }
 
   async recoverConversationModelSelection(
-    conversation: Conversation,
+    conversation: ProviderHistoryInput,
     _vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
   ): Promise<string | null> {
@@ -91,7 +94,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
     );
     const deadline = Date.now() + CODEX_HISTORY_LOOKUP_TIMEOUT_MS;
     if (!isPendingFork && state.forkSource && state.threadId) {
-      const sourceSessionFile = await this.resolveSourceSessionFile(
+      const sourceSessionFile = await this.#resolveSourceSessionFile(
         state,
         pathContext,
         deadline,
@@ -138,10 +141,11 @@ export class CodexConversationHistoryService implements ProviderConversationHist
   }
 
   async hydrateConversationHistory(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     _vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
-  ): Promise<void> {
+  ): Promise<ProviderHistoryUpdate> {
+    const conversation = copyProviderHistoryState(input);
     const lookupDeadline = Date.now() + CODEX_HISTORY_LOOKUP_TIMEOUT_MS;
     const state = getCodexState(conversation.providerState);
     const transcriptRootPath = resolveCodexTranscriptRootHint(
@@ -151,32 +155,32 @@ export class CodexConversationHistoryService implements ProviderConversationHist
 
     // Pending fork with existing in-memory messages: keep them as-is
     if (this.isPendingForkConversation(conversation) && conversation.messages.length > 0) {
-      return;
+      return conversation;
     }
 
     // Pending fork without messages: hydrate from source transcript truncated at resumeAt
     if (this.isPendingForkConversation(conversation)) {
-      const sourceSessionFile = await this.resolveSourceSessionFile(
+      const sourceSessionFile = await this.#resolveSourceSessionFile(
         state,
         pathContext,
         lookupDeadline,
       );
-      if (!sourceSessionFile) return;
+      if (!sourceSessionFile) return conversation;
 
-      const turns = await readSessionTurns(sourceSessionFile);
+      const turns = parseCodexSessionTurns(await readSessionContent(sourceSessionFile), state.forkSource!.resumeAt);
       const resumeAt = state.forkSource!.resumeAt;
-      const truncated = this.truncateTurnsAtCheckpoint(turns, resumeAt);
+      const truncated = this.#truncateTurnsAtCheckpoint(turns, resumeAt);
       if (!truncated) {
-        this.hydratedConversationPaths.delete(conversation.id);
-        return;
+        return conversation;
       }
       conversation.messages = truncated.flatMap(t => t.messages);
-      return;
+      await this.#hydrateSubagents(conversation.messages, sourceSessionFile, state.forkSourceTranscriptRootPath, pathContext);
+      return conversation;
     }
 
     // Established fork: source prefix + fork-only turns
     if (state.forkSource && state.threadId) {
-      const sourceSessionFile = await this.resolveSourceSessionFile(
+      const sourceSessionFile = await this.#resolveSourceSessionFile(
         state,
         pathContext,
         lookupDeadline,
@@ -195,32 +199,31 @@ export class CodexConversationHistoryService implements ProviderConversationHist
         : null);
 
       if (sourceSessionFile && forkSessionFile) {
-        const sourceTurns = await readSessionTurns(sourceSessionFile);
-        const forkTurns = await readSessionTurns(forkSessionFile);
+        const sourceContent = parseCodexSessionRecords(await readSessionContent(sourceSessionFile));
+        const sourceTurns = parseCodexSessionTurns(sourceContent);
+        const forkTurns = parseCodexSessionTurns(await readSessionContent(forkSessionFile));
 
         const resumeAt = state.forkSource.resumeAt;
-        const sourcePrefix = this.truncateTurnsAtCheckpoint(sourceTurns, resumeAt);
+        const sourcePrefix = this.#truncateTurnsAtCheckpoint(parseCodexSessionTurns(sourceContent, resumeAt), resumeAt);
         if (!sourcePrefix) {
-          this.hydratedConversationPaths.delete(conversation.id);
-          return;
+          return conversation;
         }
         const sourceTurnIds = new Set(sourceTurns.map(t => t.turnId).filter(Boolean));
         const forkOnlyTurns = forkTurns.filter(t => !t.turnId || !sourceTurnIds.has(t.turnId));
 
-        const messages = [
-          ...sourcePrefix.flatMap(t => t.messages),
-          ...forkOnlyTurns.flatMap(t => t.messages),
-        ];
+        const sourceMessages = sourcePrefix.flatMap(t => t.messages);
+        const forkMessages = forkOnlyTurns.flatMap(t => t.messages);
+        const messages = [...sourceMessages, ...forkMessages];
 
         if (messages.length === 0) {
-          this.hydratedConversationPaths.delete(conversation.id);
-          return;
+          return conversation;
         }
 
+        await this.#hydrateSubagents(sourceMessages, sourceSessionFile, state.forkSourceTranscriptRootPath, pathContext);
+        await this.#hydrateSubagents(forkMessages, forkSessionFile, transcriptRootPath, pathContext);
         conversation.messages = messages;
-        this.hydratedConversationPaths.set(conversation.id, `fork::${state.threadId}`);
-        this.markNativeConversationContextEstablished(conversation);
-        return;
+        this.#markNativeConversationContextEstablished(conversation);
+        return conversation;
       }
     }
 
@@ -242,18 +245,10 @@ export class CodexConversationHistoryService implements ProviderConversationHist
       ?? deriveCodexSessionsRootFromSessionPath(sessionFilePath);
 
     if (!sessionFilePath) {
-      this.hydratedConversationPaths.delete(conversation.id);
-      return;
+      return conversation;
     }
 
-    const hydrationKey = `${threadId ?? ''}::${sessionFilePath}`;
-    if (
-      conversation.messages.length > 0
-      && this.hydratedConversationPaths.get(conversation.id) === hydrationKey
-    ) {
-      this.markNativeConversationContextEstablished(conversation);
-      return;
-    }
+
 
     if (sessionFilePath !== state.sessionFilePath) {
       conversation.providerState = {
@@ -272,26 +267,37 @@ export class CodexConversationHistoryService implements ProviderConversationHist
 
     const sdkMessages = await parseCodexSessionFileAsync(sessionFilePath);
     if (sdkMessages.length === 0) {
-      this.hydratedConversationPaths.delete(conversation.id);
-      return;
+      return conversation;
     }
 
+    await this.#hydrateSubagents(sdkMessages, sessionFilePath, resolvedTranscriptRootPath, pathContext);
     conversation.messages = sdkMessages;
-    this.hydratedConversationPaths.set(conversation.id, hydrationKey);
-    this.markNativeConversationContextEstablished(conversation);
+    this.#markNativeConversationContextEstablished(conversation);
+    return conversation;
   }
 
-  resolveSessionIdForConversation(conversation: Conversation | null): string | null {
+  async #hydrateSubagents(
+    messages: ChatMessage[], sessionFilePath: string, rootHint: string | null | undefined,
+    pathContext?: ProviderHistoryPathContext,
+  ): Promise<void> {
+    const root = resolveCodexTranscriptRootHint(rootHint ?? deriveCodexSessionsRootFromSessionPath(sessionFilePath), pathContext);
+    await hydrateCodexSubagentHistory(messages, [
+      ...(root ? [root] : []), ...getCodexArchivedTranscriptRoots(pathContext, root ? [root] : []),
+    ], Date.now() + CODEX_HISTORY_LOOKUP_TIMEOUT_MS);
+  }
+
+  resolveSessionIdForConversation(conversation: ProviderHistoryInput | null): string | null {
     if (!conversation) return null;
     const state = getCodexState(conversation.providerState);
     return state.threadId ?? conversation.sessionId ?? state.forkSource?.sessionId ?? null;
   }
 
   async resolveMissingConversationSession(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     _vaultPath: string | null,
     missingProviderSessionId?: string,
-  ): Promise<'delete' | 'reset' | 'preserve'> {
+  ): Promise<ProviderHistoryResult<'delete' | 'reset' | 'preserve'>> {
+    const conversation = copyProviderHistoryState(input);
     const state = getCodexState(conversation.providerState);
     const currentSessionId = state.pendingForkTarget?.threadId
       ?? state.threadId
@@ -309,7 +315,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
       || missingProviderSessionId !== currentSessionId
       || liveSessionIds.some(sessionId => sessionId !== currentSessionId)
     ) {
-      return 'preserve';
+      return { outcome: 'preserve' };
     }
 
     const providerState = { ...(conversation.providerState ?? {}) };
@@ -320,17 +326,16 @@ export class CodexConversationHistoryService implements ProviderConversationHist
     conversation.providerState = Object.keys(providerState).length > 0
       ? providerState
       : undefined;
-    this.hydratedConversationPaths.delete(conversation.id);
-    return 'reset';
+    return { outcome: 'reset', changes: conversation };
   }
 
-  isPendingForkConversation(conversation: Conversation): boolean {
+  isPendingForkConversation(conversation: ProviderHistoryInput): boolean {
     const state = getCodexState(conversation.providerState);
     return !!state.forkSource && !state.threadId && !conversation.sessionId;
   }
 
-  private markNativeConversationContextEstablished(
-    conversation: Conversation,
+  #markNativeConversationContextEstablished(
+    conversation: ProviderHistoryState,
   ): void {
     const state = getCodexState(conversation.providerState);
     if (state.nativeConversationContextEstablished !== false) return;
@@ -340,11 +345,13 @@ export class CodexConversationHistoryService implements ProviderConversationHist
     };
   }
 
-  buildForkProviderState(
+  async buildForkProviderState(
     sourceSessionId: string,
     resumeAt: string,
     sourceProviderState?: Record<string, unknown>,
-  ): Record<string, unknown> {
+    _vaultPath?: string | null,
+    pathContext?: ProviderHistoryPathContext,
+  ): Promise<Record<string, unknown>> {
     const sourceState = getCodexState(sourceProviderState);
     const sourceTranscriptRootPath = sourceState.transcriptRootPath
       ?? deriveCodexSessionsRootFromSessionPath(sourceState.sessionFilePath);
@@ -362,11 +369,34 @@ export class CodexConversationHistoryService implements ProviderConversationHist
           : {}
       ),
     };
+    const deadline = Date.now() + CODEX_HISTORY_LOOKUP_TIMEOUT_MS;
+    let sourcePath = await this.#resolveSourceSessionFile(providerState, pathContext, deadline);
+    let turns = sourcePath ? parseCodexSessionTurns(await readSessionContent(sourcePath)) : [];
+    if (turns.length === 0) {
+      const trustedRoot = resolveCodexTranscriptRootHint(sourceTranscriptRootPath, pathContext);
+      const roots = [
+        ...(trustedRoot ? [trustedRoot] : []),
+        ...getCodexArchivedTranscriptRoots(pathContext, trustedRoot ? [trustedRoot] : []),
+      ];
+      for (const root of roots) {
+        const candidate = await findCodexSessionFileAsync(
+          sourceSessionId, root, Math.max(0, deadline - Date.now()),
+        );
+        if (!candidate || candidate === sourcePath) continue;
+        sourcePath = candidate;
+        turns = parseCodexSessionTurns(await readSessionContent(candidate));
+        if (turns.length > 0) break;
+      }
+    }
+    if (!sourcePath || !turns.some(turn => turn.turnId === resumeAt)) {
+      throw new Error(`Fork checkpoint not found: ${resumeAt}. Reload the source conversation and choose an available checkpoint.`);
+    }
+    providerState.forkSourceSessionFilePath = sourcePath;
     return providerState as Record<string, unknown>;
   }
 
   buildPersistedProviderState(
-    conversation: Conversation,
+    conversation: ProviderHistoryInput,
   ): Record<string, unknown> | undefined {
     const entries = Object.entries(getCodexState(conversation.providerState))
       .filter(([, value]) => value !== undefined);
@@ -377,7 +407,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private async resolveSourceSessionFile(
+  async #resolveSourceSessionFile(
     state: CodexProviderState,
     pathContext?: ProviderHistoryPathContext,
     lookupDeadline = Date.now() + CODEX_HISTORY_LOOKUP_TIMEOUT_MS,
@@ -402,7 +432,7 @@ export class CodexConversationHistoryService implements ProviderConversationHist
       : null);
   }
 
-  private truncateTurnsAtCheckpoint(
+  #truncateTurnsAtCheckpoint(
     turns: CodexParsedTurn[],
     resumeAt: string,
   ): CodexParsedTurn[] | null {

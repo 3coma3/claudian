@@ -1,7 +1,7 @@
 import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
 
 import type { ProviderInteractionPort } from '@/core/execution';
-import { createClaudeExecutionCanUseTool } from '@/providers/claude/execution/ClaudeInteractionHandler';
+import { ClaudeInteractionHandler } from '@/providers/claude/execution/ClaudeInteractionHandler';
 import type { ClaudePermissionDestination } from '@/providers/claude/settings';
 
 function createPort(): jest.Mocked<ProviderInteractionPort> {
@@ -23,14 +23,14 @@ function createHandler(
   onToolBlocked: jest.Mock = jest.fn(),
   permissionDestination: ClaudePermissionDestination = 'localSettings',
 ): CanUseTool {
-  return createClaudeExecutionCanUseTool({
+  return new ClaudeInteractionHandler({
     interactionPort: port,
     sessionInstanceId: 'session-local',
     getTurnId: () => 'turn-local',
     isToolAllowed: () => true,
     getPermissionDestination: () => permissionDestination,
     onToolBlocked,
-  });
+  }).canUseTool;
 }
 
 const nativeOptions = {
@@ -39,7 +39,7 @@ const nativeOptions = {
   requestId: 'native-request-1',
 };
 
-describe('createClaudeExecutionCanUseTool', () => {
+describe('ClaudeInteractionHandler', () => {
   it('allows only the current invocation for an allow-once decision', async () => {
     const port = createPort();
     port.requestApproval.mockImplementation(async (request) => ({
@@ -193,14 +193,14 @@ describe('createClaudeExecutionCanUseTool', () => {
 
   it('fails closed for disallowed tools before opening an interaction', async () => {
     const port = createPort();
-    const handler = createClaudeExecutionCanUseTool({
+    const handler = new ClaudeInteractionHandler({
       interactionPort: port,
       sessionInstanceId: 'session-local',
       getTurnId: () => 'turn-local',
       isToolAllowed: (toolName) => toolName === 'Read',
       getPermissionDestination: () => 'localSettings',
       onToolBlocked: jest.fn(),
-    });
+    }).canUseTool;
 
     const result = await handler('Edit', {}, nativeOptions);
 

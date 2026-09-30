@@ -1,3 +1,4 @@
+import { getInstallationKey as getHostnameKey } from '@/core/device/InstallationKey';
 import {
   parseDefaultWslDistroListOutput,
   resolveCodexExecutionTarget,
@@ -9,7 +10,7 @@ describe('resolveCodexExecutionTarget', () => {
       settings: {
         providerConfigs: {
           codex: {
-            installationMethod: 'wsl',
+            installationMethodsByHost: { [getHostnameKey()]: 'wsl' },
           },
         },
       },
@@ -30,8 +31,8 @@ describe('resolveCodexExecutionTarget', () => {
       settings: {
         providerConfigs: {
           codex: {
-            installationMethod: 'wsl',
-            wslDistroOverride: 'Debian',
+            installationMethodsByHost: { [getHostnameKey()]: 'wsl' },
+            wslDistroOverridesByHost: { [getHostnameKey()]: 'Debian' },
           },
         },
       },
@@ -50,7 +51,7 @@ describe('resolveCodexExecutionTarget', () => {
       settings: {
         providerConfigs: {
           codex: {
-            installationMethod: 'wsl',
+            installationMethodsByHost: { [getHostnameKey()]: 'wsl' },
           },
         },
       },
@@ -70,7 +71,7 @@ describe('resolveCodexExecutionTarget', () => {
       settings: {
         providerConfigs: {
           codex: {
-            installationMethod: 'wsl',
+            installationMethodsByHost: { [getHostnameKey()]: 'wsl' },
           },
         },
       },

@@ -1,3 +1,4 @@
+import { testDate } from '@test/helpers/testClock';
 import type { TFile } from 'obsidian';
 
 import { MentionSource } from '@/shared/composer-dropdown/MentionSource';
@@ -13,23 +14,37 @@ function file(path: string, mtime = 1): TFile {
   } as TFile;
 }
 
-function source(overrides: Record<string, unknown> = {}) {
+function source(
+  overrides: Record<string, unknown> = {},
+  options: ConstructorParameters<typeof MentionSource>[1] = {},
+) {
   const value = new MentionSource({
     getCachedVaultFiles: () => [file('notes/Alpha.md', 5)],
     getCachedVaultFolders: () => [{ name: 'notes', path: 'notes' }],
-    normalizePathForVault: path => path ?? null,
     ...overrides,
-  });
+  }, options);
   return { source: value };
 }
 
 describe('MentionSource', () => {
-  it('opts input-driven loads into debounce while keeping the source API otherwise unchanged', () => {
-    const { source: value } = source();
-
-    expect(value.inputLoadPolicy).toBe('debounced');
-
-    value.destroy();
+  it('formats only retained suggestions while preserving file and folder ranking', async () => {
+    const now = testDate().getTime();
+    const files = Array.from({ length: 250 }, (_, index) => file(`folder${index % 60}/Note ${index}.md`, now + index + 1));
+    const formatVaultFileMention = jest.fn((path: string) => `@${path} `);
+    const { source: value } = source({
+      getCachedVaultFiles: () => files,
+      getCachedVaultFolders: () => Array.from({ length: 60 }, (_, index) => ({ name: `folder${index}`, path: `folder${index}` })),
+    }, { formatVaultFileMention });
+    const items = await value.load(value.match('@', 1)!, new AbortController().signal);
+    expect(items).toHaveLength(150);
+    expect(items.slice(0, 2)).toEqual([
+      expect.objectContaining({ id: 'vault-file:folder9/Note 249.md', replacement: '@folder9/Note 249.md ' }),
+      expect.objectContaining({ id: 'vault-folder:folder9', replacement: '@folder9/ ' }),
+    ]);
+    expect(formatVaultFileMention).toHaveBeenCalledTimes(100);
+    files[0].stat.mtime = now + 1000;
+    const updated = await value.load(value.match('@', 1)!, new AbortController().signal);
+    expect(updated.slice(0, 2).map(item => item.id)).toEqual(['vault-file:folder0/Note 0.md', 'vault-folder:folder0']);
   });
 
   it('matches @ at a token boundary and preserves file names containing spaces', () => {
@@ -76,7 +91,7 @@ describe('MentionSource', () => {
   it('keeps base mentions available when an optional extension fails', async () => {
     const { source: value } = source();
     value.setExtensionFoldersLoader(async () => {
-      throw new Error('Collab unavailable');
+      throw new Error('Reference source unavailable');
     });
 
     const items = await value.load(value.match('@alp', 4)!, new AbortController().signal);

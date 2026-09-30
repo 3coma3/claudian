@@ -181,18 +181,18 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
     }));
   });
 
-  it('falls back to the error code when the API error message has no text block', () => {
+  it('falls back to the described error code when the API error message has no text block', () => {
     const normalizer = new ClaudeExecutionEventNormalizer();
 
     const events = normalizer.normalize(apiErrorMessage([]), 'requested');
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'native_error',
-      message: 'rate_limit',
+      message: 'Claude rate limit reached. Try again later.',
     }));
   });
 
-  it('falls back to the error code when the API error text is only whitespace', () => {
+  it('falls back to the described error code when the API error text is only whitespace', () => {
     const normalizer = new ClaudeExecutionEventNormalizer();
 
     const events = normalizer.normalize(
@@ -202,7 +202,7 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'native_error',
-      message: 'rate_limit',
+      message: 'Claude rate limit reached. Try again later.',
     }));
   });
 
@@ -216,7 +216,7 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'native_error',
-      message: 'rate_limit',
+      message: 'Claude rate limit reached. Try again later.',
     }));
   });
 
@@ -259,7 +259,7 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
     }));
   });
 
-  it('keeps the error code for an assistant error without synthetic markers', () => {
+  it('keeps partial prose as a reply for an error on a real model message', () => {
     const normalizer = new ClaudeExecutionEventNormalizer();
 
     const events = normalizer.normalize(msg({
@@ -273,12 +273,24 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'native_error',
-      message: 'max_output_tokens',
+      message: 'Claude reached the output token limit for this response.',
     }));
     expect(events).toContainEqual(expect.objectContaining({
       type: 'output',
       event: expect.objectContaining({ type: 'text_delta', text: 'Partial response' }),
     }));
+  });
+
+  it('uses synthetic max_output_tokens prose as the error without echoing it as a reply', () => {
+    const prose = "API Error: Claude's response exceeded the 32000 output token maximum.";
+    const events = new ClaudeExecutionEventNormalizer().normalize(msg({
+      type: 'assistant',
+      error: 'max_output_tokens',
+      message: { model: '<synthetic>', content: [{ type: 'text', text: prose }] },
+    }), 'requested');
+
+    expect(events).toContainEqual({ type: 'native_error', message: prose });
+    expect(events.filter(event => event.type === 'output')).toEqual([]);
   });
 
   it('leaves synthetic assistant messages without an error field unchanged', () => {
@@ -313,4 +325,65 @@ describe('ClaudeExecutionEventNormalizer api error messages', () => {
       message: 'SDK reported an execution error',
     }));
   });
+});
+
+describe('Claude task notification presentation', () => {
+  it.each([false, true])('settles tasks without inserting transcript content with background transition=%s', backgrounded => {
+    const normalizer = new ClaudeExecutionEventNormalizer();
+    normalizer.normalize(msg({ type: 'system', subtype: 'task_started', task_id: 'sync',
+      tool_use_id: 'sync-tool', is_backgrounded: false } as any), 'requested');
+    if (backgrounded) {
+      normalizer.normalize(msg({ type: 'system', subtype: 'task_updated', task_id: 'sync',
+        patch: { is_backgrounded: true } } as any), 'requested');
+    }
+    // Native tasks outlive requested turns and may complete on the background channel.
+    normalizer.reset('requested');
+    const events = normalizer.normalize(msg({ type: 'system', subtype: 'task_notification',
+      task_id: 'sync', tool_use_id: 'sync-tool', status: 'completed', summary: 'Agent answer' } as any), 'background');
+    expect(events).toContainEqual(expect.objectContaining({ type: 'async_subagent_completion' }));
+    expect(events.filter(event => event.type === 'output')).toEqual([]);
+    // Resuming a foreground agent registers it in the background under the same task ID.
+    normalizer.normalize(msg({ type: 'system', subtype: 'task_started', task_id: 'sync',
+      is_backgrounded: true } as any), 'requested');
+    const resumed = normalizer.normalize(msg({ type: 'system', subtype: 'task_notification',
+      task_id: 'sync', status: 'completed', summary: 'Second answer' } as any), 'background');
+    expect(resumed).toContainEqual(expect.objectContaining({ type: 'async_subagent_completion' }));
+    expect(resumed.filter(event => event.type === 'output')).toEqual([]);
+  });
+
+  it.each(['b0ziu71bi', 'af5dfc0e508259ca4'])('exposes completion content only as lifecycle for task %s', (taskId) => {
+    const events = new ClaudeExecutionEventNormalizer().normalize(msg({
+      type: 'system', subtype: 'task_notification', task_id: taskId,
+      status: 'completed', summary: 'Background work finished.',
+    } as any), 'background');
+    expect(events).toContainEqual({
+      type: 'async_subagent_completion', event: expect.objectContaining({ result: 'Background work finished.' }),
+    });
+  });
+
+  it('does not display native notifications excluded from the transcript', () => {
+    const events = new ClaudeExecutionEventNormalizer().normalize(msg({
+      type: 'system', subtype: 'task_notification', task_id: 'watcher',
+      status: 'completed', summary: 'Watcher update.', skip_transcript: true,
+    } as any), 'background');
+    expect(events.filter(event => event.type === 'output')).toEqual([]);
+  });
+});
+
+
+it('uses main-only SDK result usage and wall duration, excluding cumulative model usage', () => {
+  const normalizer = new ClaudeExecutionEventNormalizer();
+  const events = normalizer.normalize(msg({ type: 'result', subtype: 'success',
+    duration_ms: 2500, duration_api_ms: 1000, usage: { output_tokens: 125 },
+    modelUsage: { child: { outputTokens: 900 } },
+  }), 'requested');
+  expect(events).toContainEqual({ type: 'result', turnStats: { outputTokens: 125, durationMs: 2500 } });
+});
+
+
+it('omits throughput for success-subtype API errors', () => {
+  const events = new ClaudeExecutionEventNormalizer().normalize(msg({ type: 'result', subtype: 'success',
+    is_error: true, api_error_status: 500, duration_ms: 2500, usage: { output_tokens: 125 },
+  }), 'requested');
+  expect(events.find(event => event.type === 'result')).not.toHaveProperty('turnStats', expect.anything());
 });

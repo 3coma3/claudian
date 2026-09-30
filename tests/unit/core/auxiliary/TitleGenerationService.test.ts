@@ -1,10 +1,10 @@
-import { TitleGenerationService } from '@/core/auxiliary/TitleGenerationService';
-import { ProviderExecutionLifecycleRegistry } from '@/core/execution';
-
 import {
   FakeAuxiliaryBackend,
   waitFor,
-} from './AuxiliaryExecutionTestHarness';
+} from '@test/helpers/core/auxiliary/AuxiliaryExecutionTestHarness';
+
+import { TitleGenerationService } from '@/core/auxiliary/TitleGenerationService';
+import { ProviderExecutionLifecycleRegistry } from '@/core/execution';
 
 function createService() {
   const backend = new FakeAuxiliaryBackend();
@@ -19,6 +19,7 @@ function createService() {
     lifecycleRegistry,
     resolveLocale: () => 'ja',
     resolveModel: () => 'title-model',
+    nativePersistence: 'disabled-if-supported',
     vaultWorkingDirectory: '/vault',
   });
   return { backend, lifecycleRegistry, service };

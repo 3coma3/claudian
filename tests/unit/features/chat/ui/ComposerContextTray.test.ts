@@ -7,16 +7,17 @@ jest.mock('obsidian', () => ({
 }));
 
 describe('ComposerContextTray', () => {
-  it('updates the removable styling state when linked content becomes locked', () => {
+  it('drops the remove control when an item loses its remove action', () => {
     const containerEl = createMockEl();
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
-    const item = { id: 'linked-content', kind: 'content' as const, label: 'Draft.md' };
+    const item = { id: 'editor-selection', kind: 'selection' as const, label: '3 lines · Draft.md' };
 
-    tray.setItems('linked-content', [{ ...item, onRemove: jest.fn() }]);
-    expect(containerEl.querySelector('.claudian-context-chip')?.hasClass('claudian-context-chip--removable')).toBe(true);
+    tray.setItems('editor-selection', [{ ...item, onRemove: jest.fn() }]);
+    expect(containerEl.querySelector('.claudian-context-chip-remove')).not.toBeNull();
 
-    tray.setItems('linked-content', [item]);
-    expect(containerEl.querySelector('.claudian-context-chip')?.hasClass('claudian-context-chip--removable')).toBe(false);
+    tray.setItems('editor-selection', [item]);
+    expect(containerEl.querySelector('.claudian-context-chip')).not.toBeNull();
+    expect(containerEl.querySelector('.claudian-context-chip-remove')).toBeNull();
     tray.destroy();
   });
 
@@ -46,6 +47,7 @@ describe('ComposerContextTray', () => {
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
 
     expect(containerEl.hasClass('has-content')).toBe(false);
+    expect(containerEl.dataset.contextSlots).toBeUndefined();
 
     tray.setItems('images', [{
       id: 'image-1',
@@ -60,18 +62,20 @@ describe('ComposerContextTray', () => {
       icon: 'text-select',
       onRemove: jest.fn(),
     }]);
-    tray.setItems('linked-content', [{
-      id: 'linked-content',
-      kind: 'content',
-      label: 'Draft.md',
-      icon: 'file-text',
+    tray.setItems('browser-selection', [{
+      id: 'browser-selection',
+      kind: 'selection',
+      label: 'Selection · example.com',
+      icon: 'globe',
       onRemove: jest.fn(),
     }]);
 
     expect(containerEl.hasClass('has-content')).toBe(true);
+    // Presentations can match on which slots are filled without inspecting chips.
+    expect(containerEl.dataset.contextSlots).toBe('editor-selection browser-selection images');
     expect(containerEl.querySelectorAll('.claudian-context-chip').map((item: any) => item.dataset.contextSlot)).toEqual([
-      'linked-content',
       'editor-selection',
+      'browser-selection',
       'images',
     ]);
   });
@@ -87,7 +91,7 @@ describe('ComposerContextTray', () => {
       kind: 'selection',
       label: 'Architecture.md',
       icon: 'file-text',
-      title: 'notes/Architecture.md',
+      ariaLabel: 'notes/Architecture.md',
       onActivate,
       onRemove,
     }]);
@@ -97,7 +101,7 @@ describe('ComposerContextTray', () => {
 
     expect(mainButton?.tagName).toBe('BUTTON');
     expect(removeButton?.tagName).toBe('BUTTON');
-    expect(mainButton?.getAttribute('title')).toBe('notes/Architecture.md');
+    expect(mainButton?.getAttribute('aria-label')).toBe('notes/Architecture.md');
 
     mainButton?.click();
     removeButton?.click();
@@ -140,10 +144,10 @@ describe('ComposerContextTray', () => {
     const containerEl = createMockEl();
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
 
-    tray.setItems('linked-content', [{
-      id: 'note',
-      kind: 'content',
-      label: 'Note.md',
+    tray.setItems('browser-selection', [{
+      id: 'browser',
+      kind: 'selection',
+      label: 'Selection · example.com',
       onRemove: jest.fn(),
     }]);
     tray.setItems('editor-selection', [{
@@ -172,6 +176,39 @@ describe('ComposerContextTray', () => {
     expect(containerEl.querySelector('.claudian-context-more')?.hasClass('claudian-hidden')).toBe(true);
   });
 
+  it('measures rows from rendered chips only, ignoring chips a presentation hides', () => {
+    const containerEl = createMockEl();
+    const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
+    tray.setItems('editor-selection', [{ id: 'selection', kind: 'selection', label: '1 line selected', onRemove: jest.fn() }]);
+    tray.setItems('images', Array.from({ length: 3 }, (_, index) => ({
+      id: `image-${index}`,
+      kind: 'image' as const,
+      label: `image-${index}.png`,
+      onRemove: jest.fn(),
+    })));
+
+    // Hidden elements report no offset parent and a zero position.
+    const chips = containerEl.querySelectorAll('.claudian-context-chip');
+    const layout = (visibleTops: number[]) => [null, ...visibleTops].forEach((offsetTop, index) => {
+      Object.defineProperties(chips[index], {
+        offsetParent: { configurable: true, value: offsetTop === null ? null : containerEl },
+        offsetTop: { configurable: true, value: offsetTop ?? 0 },
+        offsetHeight: { configurable: true, value: offsetTop === null ? 0 : 24 },
+      });
+    });
+    const moreButton = containerEl.querySelector('.claudian-context-more');
+
+    layout([8, 8, 8]);
+    tray.refreshLayout();
+    expect(moreButton?.hasClass('claudian-hidden')).toBe(true);
+
+    layout([8, 8, 46]);
+    tray.refreshLayout();
+    expect(moreButton?.textContent).toBe('+1 more');
+    expect(chips[3].hasClass('claudian-context-chip--overflow-hidden')).toBe(true);
+    expect(chips[1].hasClass('claudian-context-chip--overflow-hidden')).toBe(false);
+  });
+
   it('removes the tray when the final owner clears its items', () => {
     const containerEl = createMockEl();
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
@@ -185,6 +222,7 @@ describe('ComposerContextTray', () => {
     tray.clearItems('canvas-selection');
 
     expect(containerEl.hasClass('has-content')).toBe(false);
+    expect(containerEl.dataset.contextSlots).toBeUndefined();
     expect(containerEl.children).toHaveLength(0);
   });
 });

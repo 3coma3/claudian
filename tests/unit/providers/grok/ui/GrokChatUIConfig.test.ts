@@ -51,16 +51,16 @@ function makeSettings(overrides: Record<string, unknown> = {}): Record<string, u
   };
 }
 
-jest.mock('@/utils/env', () => ({
-  ...jest.requireActual('@/utils/env'),
-  getHostnameKey: () => 'device:current',
+jest.mock('@/core/device/InstallationKey', () => ({
+  ...jest.requireActual('@/core/device/InstallationKey'),
+  getInstallationKey: () => 'device:current',
 }));
 
 describe('GrokChatUIConfig', () => {
-  it('owns only enabled provider-qualified Grok models and resolves the enabled default', () => {
+  it('owns unavailable provider-qualified Grok models and resolves the enabled default', () => {
     expect(grokChatUIConfig.ownsModel('grok', {})).toBe(false);
     expect(grokChatUIConfig.ownsModel('grok/grok-4', makeSettings())).toBe(true);
-    expect(grokChatUIConfig.ownsModel('grok/kimi-coding', makeSettings())).toBe(false);
+    expect(grokChatUIConfig.ownsModel('grok/kimi-coding', makeSettings())).toBe(true);
     expect(grokChatUIConfig.ownsModel('grok/', {})).toBe(false);
     expect(grokChatUIConfig.ownsModel('grok-4', {})).toBe(false);
     expect(grokChatUIConfig.getDefaultModel?.({})).toBeNull();
@@ -85,9 +85,27 @@ describe('GrokChatUIConfig', () => {
         },
       },
     })).map(option => option.value)).toEqual([
-      'grok/kimi-coding',
       'grok/grok-4',
+      'grok/kimi-coding',
     ]);
+  });
+
+  it('formats raw Grok ids as display names when the catalog has no richer name', () => {
+    const models = [
+      { displayName: 'grok-4.7', rawId: 'grok-4.7', reasoningEfforts: [], supportsReasoning: false },
+      { displayName: 'grok-code-fast-1', rawId: 'grok-code-fast-1', reasoningEfforts: [], supportsReasoning: false },
+      { displayName: 'kimi-coding', rawId: 'kimi-coding', reasoningEfforts: [], supportsReasoning: false },
+      { displayName: 'Grok 4 Heavy', rawId: 'grok-4-heavy', reasoningEfforts: [], supportsReasoning: false },
+    ];
+
+    expect(grokChatUIConfig.getModelOptions(makeSettings({
+      providerConfigs: {
+        grok: {
+          catalogsByHost: { 'device:current': { ...catalog, models } },
+          visibleModels: null,
+        },
+      },
+    })).map(option => option.label)).toEqual(['Grok 4.7', 'Grok Code Fast 1', 'kimi-coding', 'Grok 4 Heavy']);
   });
 
   it('does not expose active or saved selections that the user disabled', () => {
@@ -134,8 +152,8 @@ describe('GrokChatUIConfig', () => {
 
     expect(grokChatUIConfig.getDefaultModel?.(settings)).toBe('grok/kimi-coding');
     expect(grokChatUIConfig.getModelOptions(settings).map(option => option.value)).toEqual([
-      'grok/grok-4',
       'grok/kimi-coding',
+      'grok/grok-4',
     ]);
   });
 
@@ -179,7 +197,7 @@ describe('GrokChatUIConfig', () => {
     expect(settings.effortLevel).toBe('xhigh');
   });
 
-  it('uses the provider-advertised reasoning default without a saved preference', () => {
+  it('defaults to High over the provider-advertised default without a saved preference', () => {
     const catalogWithAdvertisedDefault = {
       ...catalog,
       models: catalog.models.map(model => model.rawId === 'grok-4'
@@ -202,7 +220,7 @@ describe('GrokChatUIConfig', () => {
       },
     });
 
-    expect(grokChatUIConfig.getDefaultReasoningValue('grok/grok-4', settings)).toBe('medium');
+    expect(grokChatUIConfig.getDefaultReasoningValue('grok/grok-4', settings)).toBe('high');
   });
 
   it('adopts and persists a future provider-advertised effort value', () => {
@@ -234,7 +252,7 @@ describe('GrokChatUIConfig', () => {
       .toEqual(expect.arrayContaining([
         expect.objectContaining({ label: 'Maximum', value: 'max' }),
       ]));
-    expect(grokChatUIConfig.getDefaultReasoningValue('grok/grok-future', settings)).toBe('max');
+    expect(grokChatUIConfig.getDefaultReasoningValue('grok/grok-future', settings)).toBe('high');
     grokChatUIConfig.applyReasoningSelection?.('grok/grok-future', 'max', settings);
     expect(getGrokProviderSettings(settings).preferredReasoningByModel)
       .toEqual({ 'grok-future': 'max' });
@@ -324,22 +342,6 @@ describe('GrokChatUIConfig', () => {
     });
   });
 
-  it('resolves model context before custom limits and the provider fallback', () => {
-    const settings = makeSettings();
-
-    expect(grokChatUIConfig.getContextWindowSize(
-      'grok/grok-4',
-      { 'grok/grok-4': 100_000 },
-      settings,
-    )).toBe(256_000);
-    expect(grokChatUIConfig.getContextWindowSize(
-      'grok/unknown',
-      { 'grok/unknown': 123_000 },
-      settings,
-    )).toBe(123_000);
-    expect(grokChatUIConfig.getContextWindowSize('grok/unknown', undefined, settings)).toBe(200_000);
-  });
-
   it('normalizes explicit ids without replacing hidden current selections', () => {
     const settings = makeSettings({ model: 'grok/kimi-coding' });
 
@@ -350,12 +352,10 @@ describe('GrokChatUIConfig', () => {
   });
 
   it('uses Safe for obsolete selections and supports explicit YOLO', () => {
-    expect(grokChatUIConfig.getPermissionModeToggle?.()).toEqual({
-      activeLabel: 'YOLO',
-      activeValue: 'yolo',
-      inactiveLabel: 'Safe',
-      inactiveValue: 'normal',
-    });
+    expect(grokChatUIConfig.getPermissionModeOptions?.()).toEqual([
+      { value: 'normal', label: 'SAFE' },
+      { value: 'yolo', label: 'YOLO', bypassesApprovals: true },
+    ]);
     expect(grokChatUIConfig.getModeSelector?.({})).toBeNull();
 
     const settings: Record<string, unknown> = {

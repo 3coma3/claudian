@@ -1,30 +1,21 @@
 import { mapWithConcurrency } from '../../utils/concurrency';
 import { decodeLinkedContentPathFields } from '../path/LinkedContentPath';
 import {
-  DEFAULT_CHAT_PROVIDER_ID,
   type SessionMetadataListOptions,
   type SessionMetadataScanResult,
 } from '../providers/types';
 import type { VaultFileAdapter } from '../storage/VaultFileAdapter';
 import type {
-  ConversationMeta,
   ConversationModelRecoverySource,
   SessionMetadata,
 } from '../types';
 import {
-  ASSIGNMENT_MARKER_SUFFIX,
-  DELETION_MARKER_SUFFIX,
   getDeviceSessionsPath,
-  isDeviceSettingsKey,
-  LEGACY_SESSIONS_PATH,
   SESSIONS_PATH,
 } from './storagePaths';
 
 export {
-  ASSIGNMENT_MARKER_SUFFIX,
-  DELETION_MARKER_SUFFIX,
-  LEGACY_SESSIONS_PATH,
-  SESSIONS_PATH,
+  SESSIONS_PATH
 };
 
 const SAFE_METADATA_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -32,63 +23,8 @@ const SESSION_METADATA_READ_CONCURRENCY = 8;
 const SESSION_METADATA_PUBLISH_BATCH_SIZE = 16;
 const METADATA_SUFFIX = '.meta.json';
 
-export const SESSION_METADATA_ASSIGNMENT_SCHEMA_VERSION = 1 as const;
-
-export interface SessionMetadataAssignment {
-  schemaVersion: typeof SESSION_METADATA_ASSIGNMENT_SCHEMA_VERSION;
-  conversationId: string;
-  deviceKey: string;
-}
-
-export type SessionMetadataAssignmentReadResult =
-  | { status: 'missing' }
-  | { status: 'invalid' }
-  | { status: 'assigned'; assignment: SessionMetadataAssignment };
-
 export type SessionMetadataAuthority = 'device' | 'unscoped';
-export type SessionMetadataSource = SessionMetadataAuthority | 'legacy';
-
-interface SessionMetadataCandidateState {
-  assignment: SessionMetadataAssignmentReadResult;
-  deviceDeleted: boolean;
-  deviceMetadataPath?: string;
-  legacyMetadataPath?: string;
-  unscopedDeleted: boolean;
-  unscopedMetadataPath?: string;
-}
-
-interface SessionMetadataCandidate {
-  path: string;
-  source: SessionMetadataSource;
-}
-
-function selectSessionMetadataCandidate(
-  state: SessionMetadataCandidateState,
-  deviceKey: string,
-): SessionMetadataCandidate | null {
-  if (state.assignment.status === 'invalid') return null;
-  if (state.assignment.status === 'assigned') {
-    if (state.assignment.assignment.deviceKey !== deviceKey) return null;
-    if (state.deviceDeleted) return null;
-    if (state.deviceMetadataPath) {
-      return { path: state.deviceMetadataPath, source: 'device' };
-    }
-    return state.unscopedMetadataPath
-      ? { path: state.unscopedMetadataPath, source: 'device' }
-      : null;
-  }
-
-  if (state.deviceMetadataPath && !state.deviceDeleted) {
-    return { path: state.deviceMetadataPath, source: 'device' };
-  }
-  if (state.unscopedMetadataPath && !state.unscopedDeleted) {
-    return { path: state.unscopedMetadataPath, source: 'unscoped' };
-  }
-  if (state.legacyMetadataPath && !state.unscopedDeleted) {
-    return { path: state.legacyMetadataPath, source: 'legacy' };
-  }
-  return null;
-}
+export type SessionMetadataSource = SessionMetadataAuthority;
 
 export interface SessionMetadataReadResult {
   metadata: SessionMetadata;
@@ -109,6 +45,7 @@ export interface SessionMetadataReadOptions {
 
 export interface SessionMetadataReader {
   load(id: string): Promise<SessionMetadataReadResult | null>;
+  revalidate(records: readonly SessionMetadataReadResult[]): Promise<SessionMetadataReadResult[]>;
   scan(options?: SessionMetadataReadOptions): Promise<SessionMetadataReadScanResult>;
   loadMetadata(id: string): Promise<SessionMetadata | null>;
   scanMetadata(options?: SessionMetadataListOptions): Promise<SessionMetadataScanResult>;
@@ -129,19 +66,14 @@ export function assertValidSessionMetadataId(id: string): void {
 }
 
 export class SessionStorage implements SessionMetadataReader {
-  private readonly deviceKey: string;
   private readonly deviceSessionsPath: string;
+  private readonly readVersions = new WeakMap<SessionMetadataReadResult, { mtime: number; size: number }>();
 
   constructor(
     private readonly adapter: VaultFileAdapter,
     deviceKey: string,
   ) {
     this.deviceSessionsPath = getDeviceSessionsPath(deviceKey);
-    this.deviceKey = deviceKey;
-  }
-
-  getDeviceKey(): string {
-    return this.deviceKey;
   }
 
   getMetadataPath(id: string): string {
@@ -152,37 +84,6 @@ export class SessionStorage implements SessionMetadataReader {
   getUnscopedMetadataPath(id: string): string {
     assertValidSessionMetadataId(id);
     return `${SESSIONS_PATH}/${id}${METADATA_SUFFIX}`;
-  }
-
-  getLegacyMetadataPath(id: string): string {
-    assertValidSessionMetadataId(id);
-    return `${LEGACY_SESSIONS_PATH}/${id}${METADATA_SUFFIX}`;
-  }
-
-  getDeviceDeletionMarkerPath(id: string): string {
-    assertValidSessionMetadataId(id);
-    return `${this.deviceSessionsPath}/${id}${DELETION_MARKER_SUFFIX}`;
-  }
-
-  getUnscopedDeletionMarkerPath(id: string): string {
-    assertValidSessionMetadataId(id);
-    return `${SESSIONS_PATH}/${id}${DELETION_MARKER_SUFFIX}`;
-  }
-
-  getAssignmentMarkerPath(id: string): string {
-    assertValidSessionMetadataId(id);
-    return `${SESSIONS_PATH}/${id}${ASSIGNMENT_MARKER_SUFFIX}`;
-  }
-
-  async loadAssignment(
-    id: string,
-  ): Promise<SessionMetadataAssignmentReadResult> {
-    assertValidSessionMetadataId(id);
-    const path = this.getAssignmentMarkerPath(id);
-    if (!await this.adapter.exists(path)) {
-      return { status: 'missing' };
-    }
-    return this.readAssignment(path, id);
   }
 
   async load(id: string): Promise<SessionMetadataReadResult | null> {
@@ -206,33 +107,43 @@ export class SessionStorage implements SessionMetadataReader {
   }
 
   private async loadOnce(id: string): Promise<SessionMetadataReadResult | null> {
-    const assignment = await this.loadAssignment(id);
-    const deviceMetadataPath = this.getMetadataPath(id);
-    const unscopedMetadataPath = this.getUnscopedMetadataPath(id);
-    const legacyMetadataPath = this.getLegacyMetadataPath(id);
-    const [
-      hasDeviceMetadata,
-      deviceDeleted,
-      hasUnscopedMetadata,
-      unscopedDeleted,
-      hasLegacyMetadata,
-    ] = await Promise.all([
-      this.adapter.exists(deviceMetadataPath),
-      this.adapter.exists(this.getDeviceDeletionMarkerPath(id)),
-      this.adapter.exists(unscopedMetadataPath),
-      this.adapter.exists(this.getUnscopedDeletionMarkerPath(id)),
-      this.adapter.exists(legacyMetadataPath),
-    ]);
-    const candidate = selectSessionMetadataCandidate({
-      assignment,
-      deviceDeleted,
-      ...(hasDeviceMetadata ? { deviceMetadataPath } : {}),
-      ...(hasLegacyMetadata ? { legacyMetadataPath } : {}),
-      unscopedDeleted,
-      ...(hasUnscopedMetadata ? { unscopedMetadataPath } : {}),
-    }, this.deviceKey);
-    if (!candidate) return null;
-    return this.readMetadata(candidate.path, id, candidate.source);
+    const candidates = [
+      { path: this.getMetadataPath(id), source: 'device' },
+      { path: this.getUnscopedMetadataPath(id), source: 'unscoped' },
+    ] as const;
+    for (const { path, source } of candidates) {
+      if (await this.adapter.exists(path)) return this.readMetadata(path, id, source);
+    }
+    return null;
+  }
+
+  /** Recheck authority and file versions without parsing unchanged scan records twice. */
+  async revalidate(records: readonly SessionMetadataReadResult[]): Promise<SessionMetadataReadResult[]> {
+    const checked = await mapWithConcurrency([...records], async record => {
+      const version = this.readVersions.get(record);
+      if (version) {
+        try {
+          const id = record.metadata.id;
+          const candidates = [
+            { path: this.getMetadataPath(id), source: 'device' },
+            { path: this.getUnscopedMetadataPath(id), source: 'unscoped' },
+          ];
+          for (const { path, source } of candidates) {
+            if (!await this.adapter.exists(path)) continue;
+            if (source !== record.source) break;
+            const current = await this.adapter.stat(path);
+            if (current && current.mtime === version.mtime && current.size === version.size) {
+              return record;
+            }
+            break;
+          }
+        } catch {
+          // Fall back to the normal read/retry path if version checks are unavailable.
+        }
+      }
+      return this.load(record.metadata.id);
+    }, SESSION_METADATA_READ_CONCURRENCY);
+    return checked.filter((record): record is SessionMetadataReadResult => record !== null);
   }
 
   async loadMetadata(id: string): Promise<SessionMetadata | null> {
@@ -259,71 +170,15 @@ export class SessionStorage implements SessionMetadataReader {
         invalidMetadataCount: 0,
       };
     }
-    const legacyListing = await this.listFiles(LEGACY_SESSIONS_PATH);
-    const deviceDeletedIds = new Set(
-      this.indexPathsById(deviceListing.files, DELETION_MARKER_SUFFIX).keys(),
-    );
-    const unscopedDeletedIds = new Set(
-      this.indexPathsById(unscopedListing.files, DELETION_MARKER_SUFFIX).keys(),
-    );
-    let complete = legacyListing.complete;
+    let complete = true;
     let invalidMetadataCount = 0;
-    const assignmentPaths = unscopedListing.files.flatMap((path) => {
-      const id = this.getIdFromPath(path, ASSIGNMENT_MARKER_SUFFIX);
-      return id && isValidSessionMetadataId(id)
-        ? [{ id, path }]
-        : [];
-    });
-    const assignmentEntries = await mapWithConcurrency(
-      assignmentPaths,
-      async ({ id, path }) => {
-        try {
-          const result = await this.readAssignment(path, id);
-          if (result.status === 'invalid') {
-            invalidMetadataCount += 1;
-          }
-          return [id, result] as const;
-        } catch {
-          complete = false;
-          return [id, { status: 'invalid' } as const] as const;
-        }
-      },
-      SESSION_METADATA_READ_CONCURRENCY,
-    );
-    const assignmentsById = new Map(assignmentEntries);
-    const deviceMetadataPaths = this.indexPathsById(
-      deviceListing.files,
-      METADATA_SUFFIX,
-    );
-    const unscopedMetadataPaths = this.indexPathsById(
-      unscopedListing.files,
-      METADATA_SUFFIX,
-    );
-    const legacyMetadataPaths = this.indexPathsById(
-      legacyListing.files,
-      METADATA_SUFFIX,
-    );
-    const filesById = new Map<
-      string,
-      { path: string; source: SessionMetadataSource }
-    >();
-
-    const metadataIds = new Set([
-      ...deviceMetadataPaths.keys(),
-      ...unscopedMetadataPaths.keys(),
-      ...legacyMetadataPaths.keys(),
-    ]);
-    for (const id of metadataIds) {
-      const candidate = selectSessionMetadataCandidate({
-        assignment: assignmentsById.get(id) ?? { status: 'missing' },
-        deviceDeleted: deviceDeletedIds.has(id),
-        deviceMetadataPath: deviceMetadataPaths.get(id),
-        legacyMetadataPath: legacyMetadataPaths.get(id),
-        unscopedDeleted: unscopedDeletedIds.has(id),
-        unscopedMetadataPath: unscopedMetadataPaths.get(id),
-      }, this.deviceKey);
-      if (candidate) {
-        filesById.set(id, candidate);
+    const filesById = new Map<string, { path: string; source: SessionMetadataSource }>();
+    for (const [listing, source] of [
+      [deviceListing, 'device'],
+      [unscopedListing, 'unscoped'],
+    ] as const) {
+      for (const [id, path] of this.indexPathsById(listing.files, METADATA_SUFFIX)) {
+        if (!filesById.has(id)) filesById.set(id, { path, source });
       }
     }
 
@@ -395,65 +250,14 @@ export class SessionStorage implements SessionMetadataReader {
     return (await this.scanMetadata(options)).metadata;
   }
 
-  async listAllConversations(): Promise<ConversationMeta[]> {
-    const nativeMetas = await this.listMetadata();
-    const metas: ConversationMeta[] = nativeMetas.map((meta) => ({
-      id: meta.id,
-      providerId: meta.providerId ?? DEFAULT_CHAT_PROVIDER_ID,
-      selectedModel: meta.selectedModel,
-      title: meta.title,
-      createdAt: meta.createdAt,
-      lastActivityAt: meta.lastActivityAt,
-      messageCount: 0,
-      preview: 'SDK session',
-      linkedContentPath: meta.linkedContentPath,
-      isPinned: meta.isPinned,
-      isArchived: meta.isArchived,
-      titleGenerationStatus: meta.titleGenerationStatus,
-    }));
-    return metas.sort(
-      (left, right) =>
-        right.lastActivityAt - left.lastActivityAt,
-    );
-  }
-
-  private async readAssignment(
-    path: string,
-    expectedId: string,
-  ): Promise<SessionMetadataAssignmentReadResult> {
-    const content = await this.adapter.read(path);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      return { status: 'invalid' };
-    }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { status: 'invalid' };
-    }
-    const assignment = parsed as Record<string, unknown>;
-    if (
-      assignment.schemaVersion !== SESSION_METADATA_ASSIGNMENT_SCHEMA_VERSION
-      || assignment.conversationId !== expectedId
-      || !isDeviceSettingsKey(assignment.deviceKey)
-    ) {
-      return { status: 'invalid' };
-    }
-    return {
-      status: 'assigned',
-      assignment: {
-        schemaVersion: SESSION_METADATA_ASSIGNMENT_SCHEMA_VERSION,
-        conversationId: expectedId,
-        deviceKey: assignment.deviceKey,
-      },
-    };
-  }
-
   private async readMetadata(
     path: string,
     expectedId: string,
     source: SessionMetadataSource,
   ): Promise<SessionMetadataReadResult | null> {
+    // Capture before reading so a concurrent write invalidates reuse on the next check.
+    let version: { mtime: number; size: number } | null = null;
+    try { version = await this.adapter.stat(path); } catch { /* Read normally when stat is unavailable. */ }
     const content = await this.adapter.read(path);
     let parsed: unknown;
     try {
@@ -507,7 +311,9 @@ export class SessionStorage implements SessionMetadataReader {
       || linkedContent.needsMigration
       || (rawSelectedModel !== undefined && selectedModel === undefined)
       || (rawModelRecoverySource !== undefined && modelRecoverySource === undefined);
-    return { metadata, needsMigration, source };
+    const record = { metadata, needsMigration, source };
+    if (version) this.readVersions.set(record, version);
+    return record;
   }
 
   private parseModelRecoverySource(value: unknown): ConversationModelRecoverySource | undefined {

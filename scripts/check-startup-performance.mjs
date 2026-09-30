@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mainPath = path.join(root, 'main.js');
 const requiredArtifacts = ['main.js', 'manifest.json', 'styles.css'];
-export const preCollabReferenceMainBytes = 3_739_584;
+export const referenceMainBytes = 3_739_584;
 export const preStep11BundleHealthBaselineBytes = 4_896_000;
-export const mainBudgetBytes = 6_000_000;
+export const mainBudgetBytes = 5_000_000;
 export const evaluationIndicatorMs = 50;
 export const evaluationReviewThresholdMs = 150;
 const pluginArtifactNames = ['main.js', 'manifest.json'];
@@ -20,7 +20,7 @@ export function inspectArtifactSize(mainBytes) {
   return {
     budgetExceeded: mainBytes > mainBudgetBytes,
     healthBaselineDeltaBytes: mainBytes - preStep11BundleHealthBaselineBytes,
-    referenceDeltaBytes: mainBytes - preCollabReferenceMainBytes,
+    referenceDeltaBytes: mainBytes - referenceMainBytes,
   };
 }
 
@@ -138,6 +138,9 @@ Module._load = function (request, parent, isMain) {
   if (request === 'electron') return { shell: universal };
   return originalLoad.call(this, request, parent, isMain);
 };
+if (process.argv[2] === 'preloaded') {
+  for (const dependency of JSON.parse(process.argv[3])) require(dependency);
+}
 const startedAt = performance.now();
 try {
   require(mainPath);
@@ -158,46 +161,52 @@ process.stdout.write(JSON.stringify({
     path.join(root, 'node_modules', '.bun', 'node_modules'),
     process.env.NODE_PATH,
   ].filter(candidate => candidate && existsSync(candidate)).join(path.delimiter);
-  const samples = [];
-  for (let index = 0; index < 7; index += 1) {
-    const result = spawnSync(process.execPath, ['-e', childScript, mainPath], {
-      cwd: root,
-      encoding: 'utf8',
-      env: childNodePath
-        ? { ...process.env, NODE_PATH: childNodePath }
-        : process.env,
-    });
-    if (result.status !== 0) {
-      throw new Error(`Module evaluation harness failed: ${result.stderr || result.stdout}`);
+  const hostDependencies = [...new Set([...mainContents.matchAll(/require\(["']((?:@codemirror|@lezer)\/[^"']+)["']\)/g)].map(match => match[1]))];
+  const measure = (mode) => {
+    const samples = [];
+    for (let index = 0; index < 7; index += 1) {
+      const result = spawnSync(process.execPath, ['-e', childScript, mainPath, mode, JSON.stringify(hostDependencies)], {
+        cwd: root,
+        encoding: 'utf8',
+        env: childNodePath
+          ? { ...process.env, NODE_PATH: childNodePath }
+          : process.env,
+      });
+      if (result.status !== 0) {
+        throw new Error(`Module evaluation harness failed: ${result.stderr || result.stdout}`);
+      }
+      let sample;
+      try {
+        sample = JSON.parse(result.stdout.trim());
+      } catch {
+        throw new Error(`Module evaluation harness returned an invalid duration: ${JSON.stringify(result.stdout)}`);
+      }
+      if (
+        !Number.isFinite(sample.durationMs)
+        || sample.childProcessStarts !== 0
+        || sample.networkListens !== 0
+        || sample.wasmInitializations !== 0
+      ) {
+        throw new Error(
+          `Module evaluation eagerly initialized a deferred runtime: ${JSON.stringify(sample)}`,
+        );
+      }
+      samples.push(sample.durationMs);
     }
-    let sample;
-    try {
-      sample = JSON.parse(result.stdout.trim());
-    } catch {
-      throw new Error(`Module evaluation harness returned an invalid duration: ${JSON.stringify(result.stdout)}`);
-    }
-    if (
-      !Number.isFinite(sample.durationMs)
-      || sample.childProcessStarts !== 0
-      || sample.networkListens !== 0
-      || sample.wasmInitializations !== 0
-    ) {
-      throw new Error(
-        `Module evaluation eagerly initialized a deferred runtime: ${JSON.stringify(sample)}`,
-      );
-    }
-    samples.push(sample.durationMs);
-  }
-  samples.sort((left, right) => left - right);
-  const medianMs = samples[Math.floor(samples.length / 2)];
+    samples.sort((left, right) => left - right);
+    return samples[Math.floor(samples.length / 2)];
+  };
+  const medianMs = measure('cold');
+  const preloadedMs = measure('preloaded');
   const deltaMiB = artifact.referenceDeltaBytes / 1024 / 1024;
 
   console.log(
     `main.js ${(mainBytes / 1024 / 1024).toFixed(2)} MiB (${mainBytes} bytes); `
-    + `pre-Collab reference delta ${signed(artifact.referenceDeltaBytes)} bytes `
+    + `reference delta ${signed(artifact.referenceDeltaBytes)} bytes `
     + `(${signed(deltaMiB.toFixed(2))} MiB); `
     + `pre-Step-11 health baseline delta ${signed(artifact.healthBaselineDeltaBytes)} bytes; `
-    + `median cold evaluation ${medianMs.toFixed(1)} ms`,
+    + `median cold Node evaluation ${medianMs.toFixed(1)} ms; `
+    + `with host dependencies preloaded ${preloadedMs.toFixed(1)} ms (Node proxies)`,
   );
   const evaluation = inspectEvaluationDuration(medianMs);
   if (evaluation === 'review-required') {

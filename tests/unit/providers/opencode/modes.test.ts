@@ -53,8 +53,8 @@ describe('OpenCode mode settings', () => {
     expect(normalizeManagedOpencodeSelectedMode('   ')).toBe('');
   });
 
-  it('normalizes the legacy build id back to the managed YOLO mode', () => {
-    expect(normalizeManagedOpencodeSelectedMode(OPENCODE_BUILD_MODE_ID)).toBe(OPENCODE_YOLO_MODE_ID);
+  it('fails closed for the retired build mode alias', () => {
+    expect(normalizeManagedOpencodeSelectedMode(OPENCODE_BUILD_MODE_ID)).toBe(OPENCODE_SAFE_MODE_ID);
   });
 
   it('maps shared permission modes onto managed OpenCode modes', () => {
@@ -65,7 +65,7 @@ describe('OpenCode mode settings', () => {
   });
 
   it('maps managed OpenCode modes back to shared permission modes', () => {
-    expect(resolvePermissionModeForManagedOpencodeMode(OPENCODE_BUILD_MODE_ID)).toBe('yolo');
+    expect(resolvePermissionModeForManagedOpencodeMode(OPENCODE_BUILD_MODE_ID)).toBeNull();
     expect(resolvePermissionModeForManagedOpencodeMode(OPENCODE_YOLO_MODE_ID)).toBe('yolo');
     expect(resolvePermissionModeForManagedOpencodeMode(OPENCODE_SAFE_MODE_ID)).toBe('normal');
     expect(resolvePermissionModeForManagedOpencodeMode('plan')).toBeNull();
@@ -88,19 +88,17 @@ describe('opencodeChatUIConfig permission mode wiring', () => {
       },
     }) ?? null).toBeNull();
 
-    expect(opencodeChatUIConfig.getPermissionModeToggle?.()).toEqual({
-      activeLabel: 'YOLO',
-      activeValue: 'yolo',
-      inactiveLabel: 'Safe',
-      inactiveValue: 'normal',
-    });
+    expect(opencodeChatUIConfig.getPermissionModeOptions?.()).toEqual([
+      { value: 'normal', label: 'SAFE' },
+      { value: 'yolo', label: 'YOLO', bypassesApprovals: true },
+    ]);
   });
 
   it('derives shared permission mode from the saved managed OpenCode mode', () => {
     expect(opencodeChatUIConfig.resolvePermissionMode?.({
       providerConfigs: {
         opencode: {
-          selectedMode: OPENCODE_BUILD_MODE_ID,
+          selectedMode: OPENCODE_YOLO_MODE_ID,
         },
       },
     })).toBe('yolo');

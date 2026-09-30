@@ -1,34 +1,33 @@
-import { createHash } from 'node:crypto';
-
 import * as fs from 'fs';
 import * as path from 'path';
-
-import { type InstallationKey, parseInstallationKey } from '@/core/device/InstallationKey';
 
 import { parsePathEntries, resolveNvmDefaultBin } from './path';
 
 const isWindows = process.platform === 'win32';
 const PATH_SEPARATOR = isWindows ? ';' : ':';
 const NODE_EXECUTABLE = isWindows ? 'node.exe' : 'node';
-const DEVICE_SETTINGS_STORAGE_KEY = 'claudian.deviceSettingsKey';
-let cachedDeviceSettingsSeed: string | null = null;
-let cachedDeviceSettingsKey: string | null = null;
 
 function getHomeDir(): string {
   return process.env.HOME || process.env.USERPROFILE || '';
 }
 
-// Linux excluded: Obsidian registers the CLI through stable symlinks (/usr/local/bin,
-// ~/.local/bin), while process.execPath may point to a transient AppImage mount.
-function getAppProvidedCliPaths(): string[] {
-  if (process.platform === 'darwin') {
-    const appBundleMatch = process.execPath.match(/^(.+?\.app)\//);
-    if (appBundleMatch) {
-      return [path.join(appBundleMatch[1], 'Contents', 'MacOS')];
-    }
-    return [path.dirname(process.execPath)];
+function getMiseShimsDir(home: string): string | null {
+  if (process.env.MISE_SHIMS_DIR) return process.env.MISE_SHIMS_DIR;
+  if (process.env.MISE_DATA_DIR) return path.join(process.env.MISE_DATA_DIR, 'shims');
+  if (process.env.XDG_DATA_HOME) return path.join(process.env.XDG_DATA_HOME, 'mise', 'shims');
+
+  if (isWindows) {
+    const localAppData = process.env.LOCALAPPDATA
+      || (home ? path.join(home, 'AppData', 'Local') : null);
+    return localAppData ? path.join(localAppData, 'mise', 'shims') : null;
   }
 
+  return home ? path.join(home, '.local', 'share', 'mise', 'shims') : null;
+}
+
+// Windows ships Obsidian.com beside the app. Unix uses registered CLI locations;
+// adding the macOS app directory can select the GUI executable as `obsidian`.
+function getAppProvidedCLIPaths(): string[] {
   if (process.platform === 'win32') {
     return [path.dirname(process.execPath)];
   }
@@ -39,9 +38,9 @@ function getAppProvidedCliPaths(): string[] {
 /** GUI apps like Obsidian have minimal PATH, so we add common binary locations. */
 function getExtraBinaryPaths(): string[] {
   const home = getHomeDir();
+  const paths: string[] = [];
 
   if (isWindows) {
-    const paths: string[] = [];
     const localAppData = process.env.LOCALAPPDATA;
     const appData = process.env.APPDATA;
     const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
@@ -127,18 +126,14 @@ function getExtraBinaryPaths(): string[] {
       paths.push(path.join(home, '.bun', 'bin'));
       paths.push(path.join(home, '.opencode', 'bin'));
     }
-
-    paths.push(...getAppProvidedCliPaths());
-
-    return paths;
   } else {
     // Unix paths
-    const paths = [
+    paths.push(
       '/usr/local/bin',
       '/opt/homebrew/bin',  // macOS ARM Homebrew
       '/usr/bin',
       '/bin',
-    ];
+    );
 
     const voltaHome = process.env.VOLTA_HOME;
     if (voltaHome) {
@@ -167,6 +162,7 @@ function getExtraBinaryPaths(): string[] {
       paths.push(path.join(home, '.bun', 'bin'));
       paths.push(path.join(home, '.opencode', 'bin'));
       paths.push(path.join(home, '.docker', 'bin'));
+      paths.push(path.join(home, '.npm-global', 'bin'));
       paths.push(path.join(home, '.volta', 'bin'));
       paths.push(path.join(home, '.asdf', 'shims'));
       paths.push(path.join(home, '.asdf', 'bin'));
@@ -183,16 +179,22 @@ function getExtraBinaryPaths(): string[] {
         }
       }
     }
-
-    paths.push(...getAppProvidedCliPaths());
-
-    return paths;
   }
+
+  const npmPrefix = process.env.npm_config_prefix;
+  if (npmPrefix) {
+    paths.push(isWindows ? npmPrefix : path.join(npmPrefix, 'bin'));
+  }
+
+  const miseShims = getMiseShimsDir(home);
+  if (miseShims) paths.push(miseShims);
+  paths.push(...getAppProvidedCLIPaths());
+
+  return paths;
 }
 
-function* findNodeDirectories(additionalPaths?: string): Generator<string, undefined> {
+function* findNodeDirectories(additionalPaths?: string, searchPaths = getExtraBinaryPaths()): Generator<string, undefined> {
   const executables = new Set<string>();
-  const searchPaths = getExtraBinaryPaths();
 
   const currentPath = process.env.PATH || '';
   const pathDirs = parsePathEntries(currentPath);
@@ -261,19 +263,6 @@ export function cliPathRequiresNode(cliPath: string): boolean {
   }
 }
 
-export function getMissingNodeError(cliPath: string, enhancedPath?: string): string | null {
-  if (!cliPathRequiresNode(cliPath)) {
-    return null;
-  }
-
-  const nodePath = findNodeExecutable(enhancedPath);
-  if (nodePath) {
-    return null;
-  }
-
-  return 'Claude Code CLI requires Node.js, but Node was not found on PATH. Install Node.js or use the native Claude Code binary, then restart Obsidian.';
-}
-
 export function getEnhancedPath(additionalPaths?: string, cliPath?: string): string {
   const extraPaths = getExtraBinaryPaths().filter(p => p);
   const currentPath = process.env.PATH || '';
@@ -301,8 +290,8 @@ export function getEnhancedPath(additionalPaths?: string, cliPath?: string): str
     }
   }
 
-  if (cliPath && cliPathRequiresNode(cliPath) && !cliDirHasNode) {
-    const nodeDir = findNodeDirectory();
+  if (cliPath && !cliDirHasNode && cliPathRequiresNode(cliPath)) {
+    const nodeDir = findNodeDirectories(undefined, extraPaths).next().value;
     if (nodeDir) {
       segments.push(nodeDir);
     }
@@ -345,92 +334,6 @@ export function parseEnvironmentVariables(input: string): Record<string, string>
     }
   }
   return result;
-}
-
-function getDeviceSettingsStorage(): Storage | null {
-  try {
-    return typeof window === 'undefined' ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function createOpaqueDeviceSettingsSeed(): string {
-  const cryptoApi = typeof window === 'undefined' ? null : window.crypto;
-  const randomUUID = cryptoApi?.randomUUID?.();
-  if (randomUUID) {
-    return randomUUID;
-  }
-
-  if (cryptoApi?.getRandomValues) {
-    const randomBytes = new Uint8Array(16);
-    cryptoApi.getRandomValues(randomBytes);
-    const entropy = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
-    return `${Date.now().toString(36)}-${entropy}`;
-  }
-
-  const entropy = Math.random().toString(36).slice(2);
-  return `${Date.now().toString(36)}-${entropy}`;
-}
-
-function getDeviceSettingsSeed(): string {
-  if (cachedDeviceSettingsSeed) {
-    return cachedDeviceSettingsSeed;
-  }
-
-  const storage = getDeviceSettingsStorage();
-  if (!storage) {
-    throw new Error('Cannot persist the device settings key: localStorage is unavailable');
-  }
-
-  let stored: string | null;
-  try {
-    stored = storage.getItem(DEVICE_SETTINGS_STORAGE_KEY)?.trim() || null;
-  } catch (error) {
-    throw new Error('Cannot read the persisted device settings key', { cause: error });
-  }
-  if (stored) {
-    cachedDeviceSettingsSeed = stored;
-    return cachedDeviceSettingsSeed;
-  }
-
-  const candidate = createOpaqueDeviceSettingsSeed();
-  try {
-    storage.setItem(DEVICE_SETTINGS_STORAGE_KEY, candidate);
-    if (storage.getItem(DEVICE_SETTINGS_STORAGE_KEY)?.trim() !== candidate) {
-      throw new Error('localStorage did not retain the device settings key');
-    }
-  } catch (error) {
-    throw new Error('Cannot persist the device settings key', { cause: error });
-  }
-
-  cachedDeviceSettingsSeed = candidate;
-  return cachedDeviceSettingsSeed;
-}
-
-// Backward-compatible name: provider settings still store legacy `cliPathsByHost`
-// maps, but new keys are opaque per-install identifiers rather than hostnames.
-export function getInstallationKey(): InstallationKey {
-  if (cachedDeviceSettingsKey) {
-    return parseInstallationKey(cachedDeviceSettingsKey);
-  }
-
-  const digest = createHash('sha256')
-    .update(getDeviceSettingsSeed(), 'utf8')
-    .digest('hex');
-  cachedDeviceSettingsKey = `device-${digest}`;
-  return parseInstallationKey(cachedDeviceSettingsKey);
-}
-
-// Backward-compatible name for provider settings whose persisted maps retain
-// the historical `ByHost` terminology.
-export function getHostnameKey(): InstallationKey {
-  return getInstallationKey();
-}
-
-export function getLegacyDeviceSettingsKey(): string | null {
-  const seed = getDeviceSettingsSeed();
-  return seed.startsWith('device:') ? seed : null;
 }
 
 export const MIN_CONTEXT_LIMIT = 1_000;

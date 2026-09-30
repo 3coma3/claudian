@@ -23,11 +23,6 @@ export const OPENCODE_FALLBACK_MODES: ReadonlyArray<OpencodeMode> = Object.freez
   },
 ]);
 
-const OPENCODE_MANAGED_MODE_IDS = new Set([
-  OPENCODE_BUILD_MODE_ID,
-  ...OPENCODE_FALLBACK_MODES.map((mode) => mode.id),
-]);
-
 export function normalizeOpencodeAvailableModes(value: unknown): OpencodeMode[] {
   if (!Array.isArray(value)) {
     return [];
@@ -66,10 +61,6 @@ export function getEffectiveOpencodeModes(modes: OpencodeMode[]): OpencodeMode[]
   return modes.length > 0 ? modes : [...OPENCODE_FALLBACK_MODES];
 }
 
-export function isManagedOpencodeModeId(value: string): boolean {
-  return OPENCODE_MANAGED_MODE_IDS.has(value);
-}
-
 export function getManagedOpencodeModes(modes: OpencodeMode[]): OpencodeMode[] {
   const effectiveModes = getEffectiveOpencodeModes(modes);
   return OPENCODE_FALLBACK_MODES.map((fallbackMode) => (
@@ -105,12 +96,9 @@ export function normalizeManagedOpencodeSelectedMode(
     return OPENCODE_SAFE_MODE_ID;
   }
 
-  const canonicalModeId = normalized === OPENCODE_BUILD_MODE_ID
-    ? OPENCODE_YOLO_MODE_ID
-    : normalized;
   const managedModes = getManagedOpencodeModes(modes);
-  return managedModes.some((mode) => mode.id === canonicalModeId)
-    ? canonicalModeId
+  return managedModes.some((mode) => mode.id === normalized)
+    ? normalized
     : managedModes.find((mode) => mode.id === OPENCODE_SAFE_MODE_ID)?.id ?? '';
 }
 
@@ -137,7 +125,7 @@ export function resolveOpencodeModeForPermissionMode(
 export function resolvePermissionModeForManagedOpencodeMode(
   modeId: unknown,
 ): PermissionMode | null {
-  if (modeId === OPENCODE_BUILD_MODE_ID || modeId === OPENCODE_YOLO_MODE_ID) {
+  if (modeId === OPENCODE_YOLO_MODE_ID) {
     return 'yolo';
   }
   if (modeId === OPENCODE_SAFE_MODE_ID) {

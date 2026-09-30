@@ -4,25 +4,16 @@
     "cancel": "取消",
     "delete": "刪除",
     "edit": "編輯",
-    "preview": "預覽",
     "add": "添加",
-    "remove": "移除",
-    "clear": "清除",
     "clearAll": "清除全部",
-    "loading": "加載中",
     "error": "錯誤",
-    "success": "成功",
-    "warning": "警告",
     "confirm": "確認",
-    "settings": "設置",
     "advanced": "高級",
-    "enabled": "已啟用",
-    "disabled": "已禁用",
-    "platform": "平台",
-    "refresh": "重新整理",
-    "rewind": "回退"
+    "refresh": "重新整理"
   },
   "chat": {
+    "selectAvailableModel": "請先選擇可用的模型再傳送。",
+    "selectAvailableTitleModel": "請在 Claudian 設定中選擇可用的標題產生模型。",
     "rewind": {
       "confirmMessage": "回退到此處？此訊息之後的檔案變更可能被覆寫或刪除。此操作無法復原。",
       "confirmMessageConflicts": "回退到此處？偵測到 {count} 個檔案在代理之外被修改，繼續操作將覆寫這些變更：\n{files}",
@@ -51,376 +42,68 @@
       "failed": "分叉失敗：{error}",
       "unavailableStreaming": "串流回應中無法分叉",
       "unavailableNoUuid": "無法分叉：缺少訊息識別碼",
-      "unavailableNoResponse": "無法分叉：沒有可分叉的回應",
       "errorMessageNotFound": "找不到訊息",
       "errorNoSession": "沒有可用的工作階段 ID",
       "errorNoActiveTab": "沒有使用中的分頁",
       "commandNoMessages": "無法分叉：對話中沒有訊息",
       "commandNoAssistantUuid": "無法分叉：沒有帶識別碼的助手回覆"
-    }
-  },
-  "collab": {
-    "surfaceGroupLabel": "側邊欄檢視",
-    "sessionsSurfaceLabel": "工作階段",
-    "commands": {
-      "open": "開啟協作",
-      "createProject": "建立協作專案",
-      "joinProject": "加入協作專案",
-      "resumeSetup": "繼續協作專案設定"
     },
-    "notices": {
-      "desktopRequired": "協作功能需要本機桌面 vault。",
-      "createRequiresGit": "建立協作專案前需要先設定 Native Git。",
-      "joinRequiresGit": "加入協作專案前需要先設定 Native Git。",
-      "initializationFailed": "協作功能無法初始化。請開啟協作面板查看復原選項。",
-      "setupReady": "協作專案「{name}」已準備完成。",
-      "setupNeedsAttention": "協作專案設定仍需處理。",
-      "noInterruptedSetup": "找不到中斷的協作專案設定。",
-      "projectFilesAvailable": "專案檔案位於 {path}。",
-      "conflictUnavailable": "協作衝突解決目前無法使用。",
-      "reviewUnavailable": "協作請求審查目前無法使用。"
+    "quote": {
+      "buttonLabel": "引用"
     },
-    "surfaceLabel": "協作",
-    "gitSetup": {
-      "title": "需要 Native Git",
-      "ready": "Native Git {version} 已就緒。",
-      "missing": "請安裝 Native Git 2.38 或更新版本以使用協作功能。",
-      "incompatible": "目前的 Git 安裝不符合協作功能需求。",
-      "officialGuide": "開啟 Git 官方安裝指南",
-      "agentPrompt": "交給 Agent 的安裝提示詞",
-      "copyPrompt": "複製提示詞",
-      "rescan": "重新偵測",
-      "manualPath": "進階 Git 路徑",
-      "savePath": "儲存路徑"
+    "sideChat": {
+      "title": "側邊對話",
+      "collapse": "收合",
+      "discard": "捨棄",
+      "statusPreparing": "準備中",
+      "statusQueued": "{count} 則排隊中",
+      "statusWorking": "處理中",
+      "statusError": "需要處理",
+      "statusActionRequired": "需要輸入",
+      "placeholder": "在側邊對話中繼續提問",
+      "composerLabel": "側邊對話訊息",
+      "needsPrompt": "請在 /side 後輸入提示詞以開始側邊對話。",
+      "unsupportedProvider": "此提供者不支援側邊對話。",
+      "unavailableBusy": "側邊對話需要一則已完成的回覆。請等待目前回合結束。",
+      "unavailableNoCheckpoint": "請先在此對話中完成一次回覆，再開始側邊對話。",
+      "unavailableNoSession": "無法解析此對話的提供者工作階段。",
+      "alreadyExists": "此對話已有側邊對話。請先捨棄後再新建。",
+      "nestedUnavailable": "側邊對話中無法再開啟側邊對話。請先收合回到主對話。",
+      "mainOnlyCommand": "/{command} 僅能在主對話中使用。",
+      "startFailed": "側邊對話啟動失敗：{error}",
+      "queued": "已加入側聊佇列。",
+      "busySide": "側邊對話仍在回覆，請稍候。"
     },
-    "createProject": {
-      "title": "建立協作專案",
-      "projectName": "專案名稱",
-      "projectNamePlaceholder": "研究筆記",
-      "memberName": "你的顯示名稱",
-      "memberNamePlaceholder": "Alice",
-      "create": "建立專案",
-      "creating": "正在建立專案…",
-      "createFailed": "無法建立專案。",
-      "resumeRequired": "專案 authority 已儲存，但 setup 尚未完成。",
-      "resume": "繼續 setup",
-      "resumeFailed": "Setup 仍需處理，請再次嘗試繼續。"
-    },
-    "joinProject": {
-      "title": "加入協作專案",
-      "invitation": "邀請字串",
-      "invitationPlaceholder": "貼上邀請字串",
-      "memberName": "你的顯示名稱",
-      "memberNamePlaceholder": "Alice",
-      "join": "加入專案",
-      "joining": "正在加入專案…",
-      "joinFailed": "無法加入專案。",
-      "resumeRequired": "成員身分已儲存，但 setup 尚未完成。",
-      "resume": "繼續加入",
-      "resumeFailed": "加入流程仍需處理，請重試。"
-    },
-    "reconnectProject": {
-      "title": "重新連線專案",
-      "description": "貼上 Host 新產生的邀請字串，以重新連線 {name}。",
-      "invitation": "邀請字串",
-      "invitationPlaceholder": "貼上新的邀請字串",
-      "reconnect": "重新連線",
-      "reconnecting": "正在重新連線專案…",
-      "failed": "無法重新連線專案，請檢查邀請字串後再試一次。"
-    },
-    "panel": {
-      "title": "協作",
-      "addProject": "新增專案",
-      "createProject": "建立",
-      "projectPicker": "選擇專案",
-      "emptyDescription": "建立本機專案，或加入其他 Claudian 使用者的專案。",
-      "joinProject": "加入",
-      "reconnectProject": "重新連線專案…",
-      "joinUnavailable": "區域網路協作完成後即可加入專案。",
-      "openProject": "開啟專案",
-      "setupIncomplete": "專案 setup 尚未完成，已儲存的 authority 不會遺失。",
-      "workingCopyMissing": "本機工作副本遺失，但已儲存的專案未被刪除。",
-      "myChanges": "我的變更",
-      "myChangesReady": "專案已就緒；變更發佈將在下一個里程碑加入。",
-      "membersAccess": "成員與權限",
-      "lanHost": "區域網路 Host",
-      "startHost": "啟動區域網路 Host",
-      "stopHost": "停止 Host",
-      "createInvitation": "建立邀請",
-      "invitation": "邀請字串",
-      "hostUnavailable": "只有專案 Host 可以啟動區域網路共享。",
-      "hostRunning": "Host 執行中",
-      "hostStopped": "Host 已停止",
-      "offline": "離線",
-      "manager": "Manager",
-      "member": "成員",
-      "loading": "正在載入協作…",
-      "loadFailed": "協作功能需要處理後才能繼續。",
-      "retry": "重試"
-    },
-    "projectManagement": {
-      "title": "專案管理"
-    },
-    "access": {
-      "memberCount": "{count} 位成員",
-      "noMembers": "目前沒有成員。",
-      "loading": "正在載入成員…",
-      "loadFailed": "無法載入成員。",
-      "retry": "重試",
-      "invitations": "邀請",
-      "createInvitation": "建立邀請",
-      "creatingInvitation": "正在建立邀請…",
-      "invitation": "邀請字串",
-      "copyInvitation": "複製邀請",
-      "revokeInvitation": "撤銷邀請",
-      "invitationCopied": "邀請已複製。",
-      "invitationRevoked": "邀請已撤銷。",
-      "invitationFailed": "無法完成邀請操作。",
-      "copyFailed": "無法複製邀請。",
-      "manager": "Manager",
-      "managerCount": "Manager：{count}",
-      "host": "Host",
-      "you": "你",
-      "status": {
-        "active": "已加入",
-        "pending": "等待加入",
-        "revoked": "已移除",
-        "left": "已退出"
-      },
-      "makeManager": "設為 Manager",
-      "makeMember": "設為一般成員",
-      "completePromotion": "完成提升",
-      "promotionPending": "等待確認",
-      "cancelPromotion": "取消提升",
-      "cancelManagerSuccession": "取消選擇繼任者",
-      "removeMember": "移除",
-      "leaveProject": "退出專案",
-      "hostRemovalBlocked": "無法移除區域網路 Host 的成員身分。",
-      "confirmPromote": "將 {name} 設為 Manager？你們兩人都會保留 Manager 身分。",
-      "confirmDemote": "將 {name} 設為一般成員？",
-      "demoteHostUnchanged": "這只會變更其角色。如果對方是區域網路 Host，Host 職責仍由對方承擔。",
-      "confirmRemove": "從協作中移除 {name}？",
-      "confirmLeave": "退出此協作？",
-      "removedFilesRetained": "對方裝置上的本地專案檔案與歷史記錄會繼續保留。",
-      "confirm": "確認",
-      "actionFailed": "無法完成權限變更，可以安全地重試。",
-      "transferHost": "Transfer Host",
-      "acceptHost": "Accept Host",
-      "decline": "Decline",
-      "cancelTransfer": "Cancel transfer",
-      "managerSuccessorRequired": "Choose a successor before leaving.",
-      "lastManagerRequired": "必須至少保留一名 Manager。",
-      "chooseManagerSuccessor": "Choose a successor to receive Manager responsibility.",
-      "waitingForManagerAcknowledgement": "正在等待 {name} 確認 Manager 職責。",
-      "managerSuccessorAcknowledged": "繼任者已確認。你現在可以退出。",
-      "hostTransferRequired": "Transfer Host before leaving.",
-      "retireProject": "Retire project",
-      "confirmRetire": "Retire this project for everyone?",
-      "leaveCleanupWarning": "Choose what happens to this local copy. Git history and unpublished Git-only work cannot be recovered after cleanup.",
-      "retireWarning": "This ends collaboration for every Member. Visible files remain on each device, but collaboration history and Git-only work are not recoverable.",
-      "actionComplete": "權限已更新。"
-    },
-    "host": {
-      "summary": "區域網路 Host",
-      "hostedHere": "託管於此裝置",
-      "hostedElsewhere": "託管於另一台裝置",
-      "legacyClaimConfirmation": "使用此裝置作為 Host 擁有者？",
-      "legacyClaimAction": "使用此裝置",
-      "status": {
-        "stopped": "已停止",
-        "starting": "正在啟動",
-        "running": "執行中",
-        "stopping": "正在停止",
-        "needsAttention": "需要處理"
-      },
-      "start": "啟動 Host",
-      "starting": "正在啟動 Host…",
-      "stop": "停止 Host",
-      "stopping": "正在停止 Host…",
-      "diagnostics": "診斷",
-      "copyDiagnostics": "複製診斷資訊",
-      "diagnosticsCopied": "已複製診斷資訊。",
-      "diagnosticsCopyFailed": "無法複製診斷資訊。",
-      "retry": "重試",
-      "startFailed": "無法啟動 Host，請查看診斷後重試。",
-      "stopFailed": "無法正常停止 Host，請查看診斷後重試。"
-    },
-    "publish": {
-      "title": "我的變更",
-      "loading": "正在檢查變更…",
-      "updateAvailable": "有可用更新",
-      "clean": "已是最新",
-      "changedFiles": "{count} 個檔案有變更",
-      "action": "發佈",
-      "publishing": "正在發佈…",
-      "offline": "離線 · 變更已儲存在本機",
-      "pushed": "變更已傳送到 Host",
-      "awaitingRequest": "正在等待同步協作請求",
-      "conflict": "衝突需要審閱",
-      "cancelled": "發佈已取消",
-      "error": "發佈需要處理",
-      "description": "說明",
-      "descriptionRequired": "發佈前請先新增說明。",
-      "descriptionPlaceholder": "描述本次審閱節點。使用 #171 關聯 Ticket，或使用 Fixes #171 解決它。",
-      "saveDescription": "儲存說明",
-      "savingDescription": "正在儲存說明…",
-      "descriptionSaved": "說明已儲存。",
-      "descriptionNotSynced": "本機草稿 — 尚未同步。",
-      "descriptionSaveFailed": "無法儲存說明。",
-      "references": "關聯",
-      "resolves": "解決",
-      "fileKind": {
-        "added": "新增",
-        "modified": "修改",
-        "deleted": "刪除",
-        "renamed": "重新命名",
-        "copied": "複製",
-        "typeChanged": "類型變更"
-      }
-    },
-    "review": {
-      "title": "審閱修改",
-      "publicationTitle": "發布前審閱",
-      "reviewAndPublish": "審閱並發布",
-      "confirmPublish": "確認並發布",
-      "confirmingPublish": "正在發布…",
-      "confirmPublishFailed": "無法發布修改",
-      "readyToPublish": "可以發布",
-      "openRequest": "開啟一項團隊修改以進行審閱。",
-      "loading": "正在載入審閱…",
-      "loadFailed": "這項修改已變更或無法載入，請重新開啟。",
-      "fileCount": "{count} 個檔案有修改",
-      "sections": "審查區段",
-      "overview": "概覽",
-      "changes": "變更 ({count})",
-      "scope": "檔案範圍",
-      "currentFile": "目前檔案",
-      "allFiles": "所有檔案",
-      "openFile": "開啟此檔案",
-      "layout": "差異版面",
-      "unified": "統一檢視",
-      "split": "左右並排",
-      "clean": "可以接受",
-      "conflicting": "需要解決衝突",
-      "stale": "成員已發佈更新的修改",
-      "noFiles": "沒有修改的檔案",
-      "loadingFile": "正在載入檔案…",
-      "accept": "接受修改",
-      "acceptRequiresSync": "請先重新連線並與 Host 同步，再接受修改。",
-      "largeText": "此文字檔案過大，無法逐行審閱。",
-      "binary": "二進位檔案",
-      "fileSize": "修改前：{oldSize} · 修改後：{newSize}",
-      "fileLoadFailed": "無法載入此檔案進行審閱。",
-      "accepting": "正在接受…",
-      "accepted": "修改已接受",
-      "acceptFailed": "無法接受修改"
-    },
-    "tickets": {
-      "editorTitle": "Ticket",
-      "sectionTitle": "Tickets",
-      "open": "Open",
-      "closed": "Closed",
-      "add": "新增 Ticket",
-      "loading": "正在載入 Ticket…",
-      "loadMore": "載入更多",
-      "offlineReadOnly": "離線 · 正在以唯讀方式顯示已儲存的 Ticket",
-      "offlineCreateUnavailable": "重新連線後才能建立 Ticket。",
-      "offlineCacheUnavailable": "離線狀態下沒有可用的已儲存 Ticket。",
-      "loadFailed": "無法載入 Ticket。",
-      "empty": "沒有 Ticket",
-      "createTitle": "新增 Ticket",
-      "create": "建立 Ticket",
-      "title": "標題",
-      "body": "說明",
-      "save": "儲存",
-      "saving": "正在儲存…",
-      "saveFailed": "無法儲存 Ticket。",
-      "close": "關閉",
-      "reopen": "重新開啟",
-      "acceptedChanges": "已接受的修改",
-      "noAcceptedChanges": "尚無已接受的修改關聯此 Ticket。",
-      "resolvedBy": "解決於",
-      "referencedBy": "關聯於",
-      "activity": "動態（{count}）",
-      "comments": "評論（{count}）",
-      "addComment": "新增評論",
-      "comment": "評論"
-    },
-    "conflict": {
-      "title": "查看衝突",
-      "requestTitle": "請求存在衝突",
-      "myChangesTitle": "我的變更存在衝突",
-      "fileCount": "{count} 個衝突檔案",
-      "editAndPublish": "修改專案檔案，然後再次發佈。",
-      "loading": "正在載入衝突…",
-      "loadFailed": "無法載入這些衝突，請重試。",
-      "loadingFile": "正在載入檔案版本…",
-      "fileLoadFailed": "無法載入此檔案。",
-      "kind": {
-        "text": "文字衝突",
-        "binary": "二進位檔案",
-        "deleteModify": "其中一側已刪除",
-        "renameDelete": "其中一側已重新命名",
-        "directoryFile": "檔案與資料夾衝突",
-        "portability": "檔名衝突"
-      },
-      "mine": "我的版本",
-      "accepted": "已接受的版本",
-      "deleted": "已刪除",
-      "sideSummary": "{path} · {size}",
-      "blocking": "此衝突無法自動解決。請在協作功能外重新命名受影響的檔案，然後重試。",
-      "reload": "重新載入衝突"
-    },
-    "team": {
-      "title": "團隊變更",
-      "loading": "正在載入變更請求…",
-      "loadFailed": "無法載入變更請求。",
-      "retry": "重試",
-      "stale": "正在顯示已儲存的變更請求 · 離線",
-      "empty": "暫無開放變更",
-      "unknownMember": "未知成員",
-      "ownMember": "你",
-      "comments": "{count} 則評論"
-    },
-    "comments": {
-      "title": "評論（{count}）",
-      "empty": "暫無評論",
-      "input": "新增評論",
-      "placeholder": "新增背景資訊或回饋…",
-      "required": "請輸入評論。",
-      "tooLarge": "評論內容過大。",
-      "submitFailed": "無法新增評論。",
-      "submit": "評論",
-      "submitting": "正在新增…",
-      "retry": "重試評論",
-      "outdated": "已過時"
-    },
-    "retired": {
-      "title": "Retired",
-      "ended": "Collaboration ended on {date}.",
-      "unknownDate": "an unknown date",
-      "files": "Your current files are still in {path}.",
-      "keepFiles": "Keep files",
-      "deleteFiles": "Delete files",
-      "retryCleanup": "Retry cleanup",
-      "finishingCleanup": "Finishing local cleanup…",
-      "cleanupFailed": "Project cleanup needs attention. Retry when ready."
+    "zen": {
+      "regionLabel": "Claudian 聊天",
+      "showHistory": "顯示對話",
+      "working": "處理中…",
+      "thinking": "思考中…",
+      "interrupted": "已中斷",
+      "workedFor": "工作了 {duration}",
+      "workedForResult": "工作了 {duration} · {result}",
+      "actionRequired": "需要你的輸入",
+      "error": "錯誤：{message}",
+      "toolRunning": "{tool} · 執行中",
+      "toolCompleted": "{tool} · 已完成",
+      "toolFailed": "{tool} · 失敗",
+      "toolBlocked": "{tool} · 已封鎖"
     }
   },
   "settings": {
-    "title": "Claudian 設定",
     "tabs": {
       "general": "一般",
-      "collab": "協作",
       "providers": "提供者",
-      "claude": "Claude",
-      "codex": "Codex"
+      "skills": "技能"
+    },
+    "providerSettings": {
+      "unavailable": "無法使用提供者設定。",
+      "loadFailed": "無法載入提供者設定：{message}"
     },
     "display": "顯示",
     "conversations": "對話",
     "content": "內容",
     "input": "輸入",
-    "setup": "設定",
     "models": "模型",
     "experimental": "實驗性功能",
     "userName": {
@@ -451,7 +134,8 @@
     "titleModel": {
       "name": "標題生成模型",
       "desc": "用於自動生成對話標題的模型。",
-      "auto": "自動 (Haiku)"
+      "select": "選擇模型",
+      "unavailableWarning": "自動標題已暫停。請選擇一個可用的標題模型。"
     },
     "navMappings": {
       "name": "Vim 風格導航映射",
@@ -471,73 +155,10 @@
     "newSessionHotkey": {
       "name": "取代目前對話"
     },
-    "newTabHotkey": {
-      "name": "新增"
-    },
-    "closeTabHotkey": {
-      "name": "關閉分頁"
-    },
-    "slashCommands": {
-      "name": "命令與技能",
-      "desc": "管理儲存在 .claude/commands/ 和 .claude/skills/ 中的 Vault 級命令與技能。由 /名稱 觸發。"
-    },
-    "hiddenSlashCommands": {
-      "name": "隱藏命令與技能",
-      "desc": "從下拉選單中隱藏特定的命令與技能。適用於隱藏與 Claudian 無關的 Claude Code 項目。每行輸入一個名稱，無需前導斜線。",
-      "placeholder": "commit\nbuild\ntest"
-    },
-    "mcpServers": {
-      "name": "MCP 伺服器",
-      "descBeforeCommand": "Claude Code 透過自己的 CLI 管理 MCP 伺服器。請使用 ",
-      "descAfterCommand": " 進行設定，它們會在 Claudian 中可用。",
-      "learnMore": "了解更多"
-    },
-    "plugins": {
-      "name": "Claude Code 外掛程式",
-      "desc": "管理從 ~/.claude/plugins 發現的 Claude Code 外掛程式。已啟用的外掛程式按 Vault 儲存在 .claude/settings.json 中。"
-    },
-    "subagents": {
-      "name": "子代理",
-      "desc": "管理儲存在 .claude/agents/ 中的 Vault 級子代理。每個 Markdown 檔案定義一個自訂代理。",
-      "noAgents": "尚未設定子代理。點擊 + 建立一個。",
-      "deleteConfirm": "刪除子代理「{name}」？",
-      "saveFailed": "儲存子代理失敗：{message}",
-      "refreshFailed": "重新整理子代理失敗：{message}",
-      "deleteFailed": "刪除子代理失敗：{message}",
-      "renameCleanupFailed": "警告：無法移除「{name}」的舊檔案",
-      "created": "已建立子代理「{name}」",
-      "updated": "已更新子代理「{name}」",
-      "deleted": "已刪除子代理「{name}」",
-      "duplicateName": "已存在名為「{name}」的代理",
-      "descriptionRequired": "描述為必填",
-      "promptRequired": "系統提示詞為必填",
-      "modal": {
-        "titleEdit": "編輯子代理",
-        "titleAdd": "新增子代理",
-        "name": "名稱",
-        "nameDesc": "僅限小寫字母、數字與連字號",
-        "namePlaceholder": "code-reviewer",
-        "description": "描述",
-        "descriptionDesc": "此代理的簡短描述",
-        "descriptionPlaceholder": "檢查程式碼中的錯誤與風格問題",
-        "advancedOptions": "進階選項",
-        "model": "模型",
-        "modelDesc": "此代理的模型覆寫",
-        "tools": "工具",
-        "toolsDesc": "允許工具的逗號分隔清單（留空 = 全部）",
-        "disallowedTools": "禁用工具",
-        "disallowedToolsDesc": "要禁用的工具清單，以逗號分隔",
-        "skills": "技能",
-        "skillsDesc": "技能清單，以逗號分隔",
-        "prompt": "系統提示詞",
-        "promptDesc": "給代理的指示",
-        "promptPlaceholder": "你是一名程式碼審查員。請分析給定的程式碼..."
-      }
-    },
     "safety": "安全",
     "loadUserSettings": {
-      "name": "載入使用者 Claude 設定",
-      "desc": "載入 ~/.claude/settings.json。啟用後，使用者的 Claude Code 權限規則可能繞過安全模式。"
+      "name": "載入使用者 Claude Code 設定",
+      "desc": "從 ~/.claude 載入使用者層級 Claude Code 設定：settings.json、技能、指令、代理程式和外掛。停用時僅能使用儲存庫層級設定。啟用後，使用者的權限規則可能繞過安全模式。"
     },
     "permissionDestination": {
       "name": "「永遠允許」規則儲存位置",
@@ -545,24 +166,25 @@
       "localSettings": "本機設定",
       "projectSettings": "專案設定"
     },
-    "claudeSafeMode": {
-      "name": "安全模式",
-      "desc": "啟用 Safe 開關時使用的權限模式。"
-    },
     "codexSafeMode": {
       "name": "安全模式",
       "desc": "啟用 Safe 開關時使用的沙盒模式。"
     },
     "environment": "環境",
+    "sharedEnvironment": {
+      "name": "共用環境",
+      "desc": "與提供者無關、所有提供者共用的執行階段變數。用於 PATH、Proxy、憑證和暫存目錄變數。"
+    },
     "customVariables": {
       "name": "自訂變數",
-      "desc": "Claude SDK 的環境變數（KEY=VALUE 格式，每行一個）。支援 export 前綴。"
+      "desc": "僅限 Claude Code 擁有的執行階段變數。用於 ANTHROPIC_* 和 Claude Code 專屬開關。"
     },
     "envSnippets": {
       "name": "片段",
       "addBtn": "新增片段",
       "noSnippets": "尚無保存的環境變數片段。點擊 + 保存當前配置。",
       "nameRequired": "請輸入片段名稱",
+      "insert": "插入",
       "modal": {
         "titleEdit": "編輯片段",
         "titleSave": "保存片段",
@@ -575,58 +197,30 @@
         "save": "保存",
         "update": "更新",
         "cancel": "取消"
-      }
+      },
+      "insertFailed": "無法插入片段",
+      "deleteConfirm": "要刪除環境變數片段「{name}」嗎？",
+      "deleteFailed": "無法刪除片段"
     },
     "customModelOverrides": {
       "name": "自訂模型覆寫",
       "desc": "為自訂模型設定模型選擇器別名和上下文視窗大小。"
     },
     "customModelAliases": {
-      "placeholder": "別名"
+      "placeholder": "別名",
+      "ariaLabel": "{model} 的別名",
+      "ariaDescription": "顯示在模型選擇器中的自訂標籤。留空則使用預設值。"
     },
     "customContextLimits": {
-      "name": "自訂上下文限制",
-      "desc": "為您的自訂模型設定上下文視窗大小。留空使用預設值（200k 權杖）。",
       "invalid": "格式無效。使用：256k、1m 或精確數量（1000-10000000）。"
-    },
-    "customModels": {
-      "name": "自訂模型",
-      "desc": "向選擇器追加額外的 Claude 模型 ID，每行一個。環境中的模型覆寫仍會取代選擇器。",
-      "placeholder": "claude-opus-4-6\nclaude-opus-4-5-20251101"
     },
     "enableChrome": {
       "name": "啟用 Chrome 擴充功能",
-      "desc": "允許 Claude 透過 claude-in-chrome 擴充功能與 Chrome 互動。需要安裝該擴充功能。需要重新啟動工作階段。"
+      "desc": "允許 Claude Code 透過 claude-in-chrome 擴充功能與 Chrome 互動。需要安裝該擴充功能。需要重新啟動工作階段。"
     },
     "maxWarmAgentProcesses": {
       "name": "最大並行執行工作階段數",
       "desc": "同時保持就緒的代理工作階段最大數量（5-10）。較早的閒置工作階段會自動暫停，並在使用時恢復。"
-    },
-    "collabGitInstallation": {
-      "summary": "Git 設定協助",
-      "requirement": "Claudian Collab 使用安裝在電腦上的 Native Git 2.38 或更新版本。",
-      "verify": "讓 Claudian 檢查並驗證你的安裝：",
-      "prompt": "請檢查這台電腦上的 Git 安裝。\n1. 回報是否已安裝 Git、執行檔路徑和版本。\n2. 如果尚未安裝 Git，請告訴我如何在這台裝置上安裝。\n3. 不要安裝或變更任何內容。"
-    },
-    "collabGitStatus": {
-      "checking": "正在檢查 Git…",
-      "available": "已偵測到 Git 執行檔",
-      "unavailable": "找不到 Git 執行檔"
-    },
-    "collabReadMore": "進一步瞭解 Claudian Collab 模式",
-    "collabGitPath": {
-      "name": "Native Git 路徑",
-      "desc": "Collab 使用的 Native Git 絕對路徑（選填）。留空時自動偵測 Git。",
-      "placeholder": "自動偵測 Git"
-    },
-    "collabEnabled": {
-      "name": "啟用 Collab",
-      "desc": "為此 Vault 啟用本機協作、Collab 引用與 Agent Runtime。"
-    },
-    "collabProjectsFolder": {
-      "name": "專案資料夾",
-      "desc": "供日後 Collab 專案使用的 Vault 相對路徑。無需預先建立；Claudian 會在下次建立或加入專案時建立或認領它。現有專案位置不會變更。",
-      "placeholder": "workspace"
     },
     "enableDualPane": {
       "name": "啟用雙欄模式",
@@ -635,10 +229,6 @@
     "restoreTabsOnStartup": {
       "name": "啟動時還原分頁",
       "desc": "單欄模式下重新開啟所有分頁，雙欄模式下僅重新開啟上次使用的分頁。"
-    },
-    "enableFilePane": {
-      "name": "啟用檔案面板",
-      "desc": "在雙欄模式的工作階段管理器中顯示「檔案」分頁。"
     },
     "dualPaneSide": {
       "name": "雙欄位置",
@@ -669,14 +259,31 @@
       "leftSidebar": "左側邊欄",
       "mainTab": "主編輯器分頁"
     },
+    "enableZenMode": {
+      "name": "啟用禪模式",
+      "desc": "側邊欄隱藏時，保持顯示精簡的聊天介面。"
+    },
+    "cliInstallation": {
+      "disclosure": "{name} 安裝",
+      "description": "此電腦的選用 CLI 路徑。留空以自動偵測。",
+      "checking": "正在偵測 CLI…",
+      "versionUnavailable": "版本未知",
+      "notFound": "未找到",
+      "custom": "自訂路徑",
+      "auto": "自動偵測",
+      "checkFailed": "無法偵測 CLI",
+      "saveFailed": "無法儲存路徑，請重試。"
+    },
     "cliPath": {
-      "name": "Claude CLI 路徑",
-      "desc": "Claude Code CLI 的自訂路徑。留空使用自動檢測。",
-      "descWindows": "對於原生安裝程式，使用 claude.exe。對於 npm/pnpm/yarn 或其他套件管理器安裝，使用 cli-wrapper.cjs 路徑（不是 claude.cmd）。",
-      "descUnix": "貼上 \"which claude\" 的輸出 - 適用於原生安裝和 npm/pnpm/yarn 安裝。",
+      "name": "Claude Code CLI 路徑",
+      "genericName": "CLI 路徑",
       "validation": {
         "notExist": "路徑不存在",
-        "isDirectory": "路徑是目錄，不是檔案"
+        "isDirectory": "路徑是目錄，不是檔案",
+        "mustBeAbsolute": "路徑必須是絕對路徑",
+        "notFile": "路徑必須指向檔案",
+        "notAccessible": "無法存取路徑",
+        "notExecutable": "路徑必須可執行"
       }
     },
     "language": {
@@ -685,22 +292,57 @@
     },
     "providerEnablement": {
       "name": "啟用 {provider}",
-      "desc": "讓已啟用的 {provider} 模型可用於新對話。停用後，現有工作階段仍會保留。",
       "lastProviderWarning": "至少需要啟用一個提供者，Claudian 才能正常運作。",
       "noModelsWarning": "未啟用任何 {provider} 模型。請前往下方的「模型」區段並至少啟用一個模型。"
+    },
+    "modelPicker": {
+      "name": "顯示的模型",
+      "desc": "選擇在聊天選擇器中可用的模型。拖曳即可調整順序；提供者會將第一個目前可用的模型作為預設模型。至少選擇一個模型才能使用此提供者。",
+      "browse": "瀏覽模型",
+      "filterLabel": "篩選 {provider} 模型",
+      "searchPlaceholder": "依模型、提供者或 ID 篩選...",
+      "providerFilterLabel": "篩選模型提供者",
+      "allProviders": "所有提供者（{count}）",
+      "discover": "探索",
+      "visible": "顯示: ",
+      "ofDiscovered": " / 已探索到 {count} 個",
+      "oneProvider": " | 1 個提供者",
+      "manyProviders": " | {count} 個提供者",
+      "loadingModels": "正在載入模型...",
+      "loading": "正在載入...",
+      "available": "{count} 個可用",
+      "noneDiscovered": "尚未探索到任何模型",
+      "selected": "已選取（{count}）",
+      "clearAllLabel": "清除所有已選取的 {provider} 模型",
+      "reorderLabel": "調整 {model} 的順序；拖曳或使用上、下方向鍵",
+      "default": "預設",
+      "unavailable": "無法使用",
+      "unavailableTitle": "{provider} 目前未回報此已設定的模型",
+      "aliasLabel": "別名（選用）",
+      "removeLabel": "移除 {model}",
+      "noMatch": "沒有符合篩選條件的模型。",
+      "emptyCatalog": "{provider} 未回報任何模型。請檢查設定並點擊「探索」。",
+      "loadingCatalog": "正在載入 {provider} 模型…",
+      "stale": "{provider} 模型目錄已過時。點擊「探索」以重新整理。"
+    },
+    "claude": {
+      "configuration": "組態",
+      "responseStyle": {
+        "name": "回覆風格",
+        "desc": "預設使用 Claude Code 的一般風格。簡潔模式先提供結果，省略開場白。需要 Claude Code 2.1.237 或更新版本。",
+        "default": "預設",
+        "concise": "簡潔"
+      }
     },
     "codex": {
       "installationMethod": {
         "name": "安裝方式",
-        "desc": "Claudian 在 Windows 上啟動 Codex 的方式。原生 Windows 使用 Windows 可執行檔路徑；WSL 會在所選發行版內啟動 Linux CLI。",
+        "desc": "Claudian 在 Windows 上啟動 Codex CLI 的方式。原生 Windows 使用 Windows 可執行檔路徑；WSL 會在所選發行版內啟動 Linux CLI。",
         "nativeWindows": "原生 Windows",
         "wsl": "WSL"
       },
       "cliPath": {
         "name": "Codex CLI 路徑",
-        "descUnix": "本機 Codex CLI 的自訂路徑。留空會優先使用已知 Codex 安裝，然後查找 PATH。",
-        "descWindows": "本機 Codex CLI 的自訂路徑。留空會從 PATH 自動偵測。請使用原生 Windows 可執行檔路徑，通常為 `codex.exe`。",
-        "descWsl": "在 WSL 內執行的 Linux 端 Codex 命令或絕對路徑。留空會在所選發行版內查找 PATH。",
         "validation": {
           "wslWindowsPath": "WSL 模式需要 Linux 命令或 Linux 絕對路徑，而不是 Windows 可執行檔路徑。"
         }
@@ -713,10 +355,11 @@
         "workspaceWrite": "工作區可寫",
         "readOnly": "唯讀"
       },
-      "customModels": {
-        "name": "自訂模型",
-        "desc": "向選擇器追加額外的 Codex 模型 ID，每行一個。設定 `OPENAI_MODEL` 時仍優先生效。",
-        "placeholder": "gpt-5.4\ngpt-5.3-codex-spark"
+      "responseStyle": {
+        "name": "回覆風格",
+        "desc": "選擇支援此功能的模型中 Codex CLI 的溝通風格。從下一則訊息開始生效。",
+        "pragmatic": "務實",
+        "friendly": "友善"
       },
       "reasoningSummary": {
         "name": "推理摘要",
@@ -730,101 +373,152 @@
         "name": "啟用 Ultra 推理強度",
         "desc": "在支援 Ultra 的 Codex 模型的推理強度選擇器中顯示此選項。Ultra 使用最高推理強度並自動委派工作。"
       },
-      "skills": {
-        "name": "Codex 技能",
-        "desc": "Manage shared vault-level skills stored only in .agents/skills/.",
-        "hiddenName": "隱藏技能",
-        "hiddenDesc": "從下拉選單中隱藏特定 Codex 技能。每行輸入一個技能名稱，不帶前導 $。",
-        "hiddenPlaceholder": "analyze\nexplain\nfix"
-      },
-      "subagents": {
-        "name": "Codex 子代理",
-        "desc": "管理儲存在 .codex/agents/ 中的 Vault 層級 Codex 子代理。每個 TOML 檔案定義一個自訂代理。"
-      },
-      "mcp": {
-        "descBeforeCommand": "Codex 透過自己的 CLI 管理 MCP 伺服器。請使用 ",
-        "descAfterCommand": " 進行設定，它們會在 Claudian 中可用。",
-        "learnMore": "了解更多"
-      },
       "environment": {
-        "name": "Codex 環境",
-        "desc": "僅限 Codex 擁有的執行階段變數。用於 OPENAI_* 和 CODEX_* 設定。如果 Codex 自動偵測需要協助，請把安裝目錄新增到共享 PATH，而不是此提供者環境。"
+        "name": "Codex CLI 環境",
+        "desc": "僅限 Codex CLI 擁有的執行階段變數。用於 OPENAI_* 和 CODEX_* 設定。如果 Codex CLI 自動偵測需要協助，請把安裝目錄新增到共享 PATH，而不是此提供者環境。"
       }
     },
     "agentSkills": {
-      "sectionTitle": "Skills", "fixedRoot": "Managed in .agents/skills", "sharedExpectation": "Manage shared skills in .agents/skills/ for compatible providers.", "noSkills": "No shared skills configured. Click + to create one.", "skillBadge": "skill", "diagnosticsTitle": "Skills needing attention", "loadFailed": "Could not load shared skills.", "savedRefreshFailed": "Saved, but provider refresh failed.", "validationFailed": "Invalid skill: {message}", "collisionFailed": "A skill named \"{name}\" already exists.", "saveFailed": "Failed to save shared skill: {message}", "deleteFailed": "Failed to move shared skill to trash: {message}", "staleConflict": "This skill changed elsewhere; refresh before saving.", "created": "Shared skill \"{name}\" created.", "updated": "Shared skill \"{name}\" updated.", "deleted": "Shared skill \"{name}\" moved to trash.",
-      "modal": { "titleEdit": "Edit Shared Skill", "titleAdd": "Add Shared Skill", "name": "Skill name", "nameDesc": "Lowercase letters and numbers separated by single hyphens", "namePlaceholder": "code-reviewer", "description": "Description", "descriptionDesc": "Required portable description used by providers to select the skill", "descriptionPlaceholder": "Reviews code for correctness and maintainability", "instructions": "Instructions", "instructionsDesc": "Required SKILL.md instructions", "instructionsPlaceholder": "Review the supplied code and report actionable findings..." },
-      "delete": { "title": "Delete Shared Skill", "description": "The entire skill folder, including scripts, references, and assets, will be moved to trash.", "confirm": "Move to trash" }
-    },
-    "codexSkills": {
-      "modal": {
-        "titleEdit": "編輯 Codex 技能",
-        "titleAdd": "新增 Codex 技能",
-        "directory": "目錄",
-        "directoryDesc": "技能的儲存位置",
-        "skillName": "技能名稱",
-        "skillNameDesc": "在 $ 後使用的名稱（例如 $analyze 的名稱為「analyze」）",
-        "description": "描述",
-        "descriptionDesc": "下拉選單中顯示的可選描述",
-        "instructions": "指令",
-        "instructionsDesc": "技能指令（SKILL.md 內容）",
-        "instructionsPlaceholder": "Analyze the code for..."
-      },
-      "instructionsRequired": "指令為必填項",
-      "saveFailed": "儲存 Codex 技能失敗",
-      "header": "Codex 技能",
-      "noSkills": "Vault 中沒有 Codex 技能。點擊 + 建立一個。",
+      "sharedExpectation": "為相容的供應商管理 .agents/skills/ 中的共用技能。",
+      "noSkills": "尚未設定共用技能。點擊 + 建立一個。",
       "skillBadge": "技能",
-      "deleted": "已刪除 Codex 技能「{name}」",
-      "deleteFailed": "刪除 Codex 技能失敗",
-      "created": "已建立 Codex 技能「{name}」",
-      "updated": "已更新 Codex 技能「{name}」"
-    },
-    "codexSubagents": {
+      "diagnosticsTitle": "需要處理的技能",
+      "loadFailed": "無法載入共用技能。",
+      "savedRefreshFailed": "已儲存，但重新整理供應商失敗。",
+      "validationFailed": "技能無效：{message}",
+      "collisionFailed": "名為「{name}」的技能已存在。",
+      "saveFailed": "無法儲存共用技能：{message}",
+      "deleteFailed": "無法將共用技能移至垃圾桶：{message}",
+      "staleConflict": "此技能已在其他地方變更；請先重新整理再儲存。",
+      "created": "已建立共用技能「{name}」。",
+      "updated": "已更新共用技能「{name}」。",
+      "deleted": "已將共用技能「{name}」移至垃圾桶。",
+      "fix": "修復",
+      "fixed": "已修復技能「{name}」。",
       "modal": {
-        "titleEdit": "編輯 Codex 子代理",
-        "titleAdd": "新增 Codex 子代理",
-        "nameDesc": "Codex 衍生代理時使用的代理名稱（小寫、連字符、底線）",
-        "descriptionDesc": "Codex 應在何時使用該代理",
-        "modelDesc": "模型覆寫（留空表示繼承）",
-        "namePlaceholder": "code_reviewer"
+        "titleEdit": "編輯共用技能",
+        "titleAdd": "新增共用技能",
+        "titleFix": "修復技能",
+        "name": "技能名稱",
+        "nameDesc": "小寫字母與數字，以單一連字號分隔",
+        "namePlaceholder": "code-reviewer",
+        "description": "描述",
+        "descriptionDesc": "必填的通用描述，供供應商選擇技能時使用",
+        "descriptionPlaceholder": "審查程式碼的正確性與可維護性",
+        "instructions": "指示",
+        "instructionsDesc": "必填的 SKILL.md 指示",
+        "instructionsPlaceholder": "審查提供的程式碼並回報可採取行動的發現..."
       },
-      "reasoningEffort": {
-        "name": "推理強度",
-        "desc": "模型推理強度級別",
-        "inherit": "繼承",
-        "low": "低",
-        "medium": "中",
-        "high": "高",
-        "xhigh": "極高"
+      "delete": {
+        "title": "刪除共用技能",
+        "description": "整個技能資料夾（包括指令碼、參考資料與資源）將移至垃圾桶。",
+        "confirm": "移至垃圾桶"
+      }
+    },
+    "opencode": {
+      "environment": {
+        "name": "OpenCode 環境變數",
+        "desc": "傳遞給 OpenCode 的額外環境變數。"
       },
-      "sandboxMode": {
-        "name": "沙盒模式",
-        "desc": "該代理的沙盒限制",
-        "inherit": "繼承",
-        "readOnly": "唯讀",
-        "dangerFullAccess": "完整存取",
-        "workspaceWrite": "工作區可寫"
+      "migrationNotice": {
+        "text": "Claudian 現已支援 OpenCode v2。OpenCode v1 的支援將於 2026 年 10 月 30 日結束。",
+        "link": "遷移至 OpenCode v2"
+      }
+    },
+    "pi": {
+      "environment": {
+        "name": "Pi 環境變數",
+        "desc": "僅傳遞給 Pi 的環境變數。"
+      }
+    },
+    "grok": {
+      "environment": {
+        "name": "Grok Build 環境變數",
+        "desc": "僅傳遞給 Grok Build 的環境變數。自訂模型的密鑰保留在此提供者範圍內，並在原生設定中透過 env_key 參照。"
+      }
+    },
+    "skills": {
+      "subTabs": {
+        "claude": "Claude Code",
+        "shared": "其他供應商"
       },
-      "nicknameCandidates": {
-        "name": "暱稱候選",
-        "desc": "顯示暱稱，使用逗號分隔（例如 atlas, delta, echo）"
+      "claudeHelp": ".claude/skills/ 中的 Claude Code 技能與 .claude/commands/ 中的指令。",
+      "sharedHelp": ".agents/skills/ 中供 Codex CLI、OpenCode、Pi 與 Grok Build 使用的共用技能。",
+      "status": {
+        "error": "無法讀取技能資料夾:{message}"
       },
-      "developerInstructions": {
-        "name": "開發者指令",
-        "desc": "定義代理行為的核心指令",
-        "placeholder": "Review code like an owner.\nPrioritize correctness, security, and missing test coverage.",
-        "required": "開發者指令為必填項"
+      "synced": "已同步",
+      "actions": {
+        "sync": "同步",
+        "resync": "重新同步"
       },
-      "validation": {
-        "nameRequired": "子代理名稱為必填項",
-        "nameTooLong": "子代理名稱必須不超過 {count} 個字元",
-        "nameInvalid": "子代理名稱只能包含小寫字母、數字、連字符和底線",
-        "nicknameInvalid": "暱稱候選只能包含 ASCII 字母、數字、空格、連字符和底線",
-        "nicknameDuplicate": "暱稱候選必須唯一"
+      "commands": {
+        "title": "Claude Code 指令",
+        "hint": "指令僅在 Claude Code 中可用。建議將其轉換為技能。",
+        "badge": "指令",
+        "empty": ".claude/commands 中沒有指令。",
+        "convert": "轉換為技能",
+        "editTitle": "編輯指令",
+        "convertTitle": "將指令轉換為技能",
+        "nameDesc": ".claude/commands 下不含 .md 的路徑;巢狀指令使用 /",
+        "descriptionDesc": "顯示在指令選單中的選用描述",
+        "updated": "已更新指令「{name}」。",
+        "converted": "已將指令轉換為技能「{name}」。",
+        "deleted": "已將指令「{name}」移至垃圾桶。",
+        "deleteTitle": "刪除指令",
+        "deleteDescription": "指令檔案將移至垃圾桶。",
+        "collisionFailed": "名為「{name}」的指令已存在。"
       },
-      "header": "Codex 子代理",
-      "noAgents": "Vault 中沒有 Codex 子代理。點擊 + 建立一個。"
+      "droppedFrontmatterWarning": "儲存後僅保留名稱與描述。以下鍵將被移除,供應商的行為可能改變:{keys}",
+      "hidden": {
+        "name": "隱藏的指令與技能",
+        "desc": "在所有供應商的指令選單中隱藏指令與技能。輸入不含前導斜線的確切名稱,每行一個(Pi 技能使用 skill:名稱)。",
+        "placeholder": "commit\ncompact\nskill:review"
+      },
+      "sync": {
+        "title": "同步技能",
+        "repairTitle": "修復技能連結",
+        "loading": "正在檢查技能資料夾...",
+        "intro": "同步會把 Claude Code 的技能與指令合併到 .agents/skills,並將 .claude/skills 連結到那裡。",
+        "pros": {
+          "oneList": "所有供應商共用一個列表。",
+          "newSkills": "新技能在所有地方可用。"
+        },
+        "cons": {
+          "dropped": "僅保留名稱與描述;供應商專屬的設定會被移除,行為可能改變。",
+          "claudeSyntax": "僅 Claude Code 支援的語法在其他供應商中無效:{names}"
+        },
+        "attentionTitle": "需要處理",
+        "nothingNeedsAttention": "沒有需要處理的項目。",
+        "nameField": "名稱",
+        "descriptionField": "描述",
+        "ready": "已就緒",
+        "problems": {
+          "name": "名稱無效。請使用小寫字母、數字與連字號。",
+          "description": "缺少描述。",
+          "instructions": "沒有指示。請在檔案中補上後重新同步。",
+          "unreadable": "無法讀取其 frontmatter。請修正檔案後重新同步。",
+          "sharedConflict": "名為「{name}」的共用技能已存在。",
+          "itemConflict": "另一個項目也叫「{name}」。"
+        },
+        "options": {
+          "fix": "修正",
+          "replace": "取代共用技能",
+          "discard": "捨棄(移至垃圾桶)",
+          "keep": "保留為指令"
+        },
+        "continue": "繼續",
+        "confirmTitle": "以連結取代 .claude/skills?",
+        "confirmBody": ".claude/skills 將被取代為指向 .agents/skills 的連結。此動作無法復原。",
+        "repairBody": ".claude/skills 將被取代為指向 .agents/skills 的連結。它目前指向的資料夾不會被修改。",
+        "linkBody": "將 .claude/skills 建立為指向 .agents/skills 的連結,讓 Claude Code 使用共用技能。不會移動任何檔案。",
+        "linkWithItemsBody": "指令將變成技能,接著 .claude/skills 被建立為指向 .agents/skills 的連結。此動作無法復原。",
+        "devicesWarning": "此儲存庫在多台裝置間同步?連結可能不會同步,請在每台裝置上執行同步。",
+        "confirm": "同步並連結",
+        "partial": "同步在建立連結前停止。請修正以下項目後重新同步。",
+        "failed": "同步失敗:{message}",
+        "summary": "已移動 {moved},已轉換 {converted},已移至垃圾桶 {trashed},已移除 {unlinked} 個連結。"
+      }
     }
   }
 }

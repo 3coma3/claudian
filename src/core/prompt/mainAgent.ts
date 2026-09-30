@@ -33,6 +33,8 @@ function getUserMessageContext(): string {
 
 The user's query comes first, followed by optional Claudian XML context tags. Treat content inside \`<![CDATA[...]]>\` as the user's literal text.
 
+Paths in Claudian XML context attributes are XML-escaped. Decode them exactly once before use: \`A &amp; B.md\` means \`A & B.md\`, while \`A &amp;amp; B.md\` means the literal filename \`A &amp; B.md\`. Paths outside these attributes are not subject to this decoding rule.
+
 - \`<linked_content path="path/to/content" />\`: The Conversation's primary file, Note, or directory.
 - Inspect only the files needed for the user's request. A linked directory is not an instruction to recursively read or summarize the entire directory.
 - Linked content does not change the vault-root working directory, does not grant access outside the existing sandbox, and does not prevent work elsewhere in the Vault.
@@ -64,9 +66,10 @@ function getFileOperations(): string {
 - Move or rename Vault notes, attachments, and folders through the running Obsidian app so Obsidian can update links according to the user's link-update settings. Do not use shell \`mv\`, filesystem rename APIs, or copy-and-delete followed by manual link replacements.
 - Use the Obsidian CLI for file moves and renames: \`obsidian vault="Vault Name" move path="folder/old.md" to="folder/new.md"\`. Supply the actual current Vault name and exact Vault-relative source and destination paths, including the file extension; do not rely on the active note or a fuzzy \`file=\` match.
 - For folder moves and renames, use \`obsidian vault="Vault Name" eval code="..."\` to resolve the source with \`app.vault.getAbstractFileByPath(sourcePath)\` and await \`app.fileManager.renameFile(folder, destinationPath)\`. Use Vault-relative paths, confirm the source is a folder, and check that the destination does not already exist. Do not use \`app.vault.rename\`, which bypasses FileManager's link updates.
+- For requested deletions, prefer Obsidian's trash behavior: \`obsidian vault="Vault Name" delete path="folder/note.md"\`. Permanent deletion must be explicitly requested.
 - Quote shell arguments and safely encode paths embedded in JavaScript. For multiple moves, await each operation and verify the resulting paths and affected links before reporting success.
-- The CLI requires a running Obsidian instance and an available \`obsidian\` executable. If a command's syntax is uncertain, run bare \`obsidian\` to inspect the installed command catalog. If link-aware moves are unavailable, report the blocker instead of silently falling back to filesystem moves.
-- For requested deletions, prefer Obsidian's trash behavior: \`obsidian vault="Vault Name" delete path="folder/note.md"\`. Permanent deletion must be explicitly requested.`;
+- Use the examples directly; for other commands or syntax errors, consult an available Obsidian CLI skill or \`obsidian help <command>\`. Never invoke the CLI without arguments. If the CLI cannot reach the running Vault or link-aware moves are unavailable, report the blocker instead of falling back to filesystem moves.
+- Do not explain Obsidian CLI choices or compare them with filesystem operations unless asked or relevant to a problem. For successful moves and renames, confirm the result without reporting routine link checks or updates; mention link details only when asked or when there is a problem or unexpected consequence.`;
 }
 
 function getReferenceConventions(): string {
@@ -121,27 +124,4 @@ export function buildSystemPrompt(
     getDynamicSections(options.dynamicSections),
     getCustomInstructions(settings.customPrompt),
   ].filter(Boolean).join('\n\n');
-}
-
-export function computeSystemPromptKey(
-  settings: SystemPromptSettings,
-  options: SystemPromptBuildOptions = {},
-): string {
-  const dynamicSectionsKey = (options.dynamicSections || [])
-    .map((section) => section.trim())
-    .filter(Boolean)
-    .join('||');
-
-  const parts = [
-    settings.mediaFolder || '',
-    settings.customPrompt || '',
-    settings.vaultPath || '',
-    (settings.userName || '').trim(),
-  ];
-
-  if (dynamicSectionsKey) {
-    parts.push(dynamicSectionsKey);
-  }
-
-  return parts.join('::');
 }

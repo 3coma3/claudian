@@ -11,7 +11,7 @@ import type {
 } from '../../../core/types';
 import type { SDKToolUseResult } from '../../../core/types/diff';
 import { extractDiffData } from '../../../utils/diff';
-import { extractAcpDiffToolUseResult } from '../../acp/AcpToolResultNormalization';
+import { extractACPDiffToolUseResult } from '../../acp/ACPToolResultNormalization';
 import {
   type GrokRawToolNameResolution,
   normalizeGrokToolCall,
@@ -77,6 +77,7 @@ interface PendingTurn {
 
 interface CompletedTurn {
   messages: ChatMessage[];
+  promptId?: string;
   promptIndex: number;
   usage?: GrokHistoryUsage;
 }
@@ -84,6 +85,7 @@ interface CompletedTurn {
 export function parseGrokHistoryContent(
   content: string,
   sessionId: string,
+  resumeAt?: string,
 ): ParsedGrokHistory {
   let completedTurns: CompletedTurn[] = [];
   let pending: PendingTurn | null = null;
@@ -100,6 +102,7 @@ export function parseGrokHistoryContent(
     if (messages.length === 0 || turn.timelinePromptIndex === null) return false;
     completedTurns.push({
       messages,
+      promptId,
       promptIndex: turn.timelinePromptIndex,
       ...(usage ? { usage } : {}),
     });
@@ -253,6 +256,17 @@ export function parseGrokHistoryContent(
     }
   }
 
+  if (resumeAt !== undefined) {
+    // Live checkpoints use prompt IDs, while stored messages retain their native IDs.
+    const checkpointIndex = completedTurns.findIndex(turn => (
+      turn.promptId === resumeAt
+      || turn.messages.some(message => (
+        message.role === 'assistant' && message.assistantMessageId === resumeAt
+      ))
+    ));
+    completedTurns = completedTurns.slice(0, checkpointIndex + 1);
+  }
+
   const messages = completedTurns.flatMap(turn => turn.messages);
   let lastUsage: GrokHistoryUsage | undefined;
   for (let index = completedTurns.length - 1; index >= 0; index -= 1) {
@@ -270,10 +284,11 @@ export function parseGrokHistoryContent(
 export async function loadGrokHistory(
   sessionDirectory: string,
   sessionId: string,
+  resumeAt?: string,
 ): Promise<ParsedGrokHistory> {
   try {
     const content = await fs.readFile(path.join(sessionDirectory, 'updates.jsonl'), 'utf8');
-    return parseGrokHistoryContent(content, sessionId);
+    return parseGrokHistoryContent(content, sessionId, resumeAt);
   } catch {
     return { messages: [] };
   }
@@ -332,24 +347,6 @@ export function resolveGrokPromptIndexAfterAssistant(
     }
   }
 
-  return resolveLegacyForkTargetPromptIndex(content, sessionId, resumeAt);
-}
-
-function resolveLegacyForkTargetPromptIndex(
-  content: string,
-  sessionId: string,
-  resumeAt: string,
-): number | null {
-  let completedPrompts = 0;
-  for (const message of parseGrokHistoryContent(content, sessionId).messages) {
-    if (message.role === 'user' && message.userMessageId) {
-      completedPrompts += 1;
-      continue;
-    }
-    if (message.assistantMessageId === resumeAt) {
-      return completedPrompts;
-    }
-  }
   return null;
 }
 
@@ -412,7 +409,7 @@ function reconcileToolUpdate(turn: PendingTurn, update: Record<string, unknown>)
     title: rawName,
   }, rawNameResolution);
   const status = normalizeToolStatus(readString(update.status), current?.status);
-  const nativeToolUseResult = extractAcpDiffToolUseResult(update.content)
+  const nativeToolUseResult = extractACPDiffToolUseResult(update.content)
     ?? current?.toolUseResult;
   const output = renderedContent || (update.rawOutput === undefined
     ? current?.output || normalized.output
@@ -620,7 +617,34 @@ export function resolveGrokUpdateMessageId(
   return readString(update.messageId)
     ?? readString(updateMetadata?.eventId)
     ?? readString(outerMetadata?.eventId)
-    ?? readString(updateMetadata?.promptId)
+    ?? readTurnMessageId(role, updateMetadata, outerMetadata);
+}
+
+/**
+ * Live Grok chunks carry a fresh eventId per streamed token, so the turn's promptId
+ * must win over eventId when deciding where a live message starts.
+ */
+export function resolveGrokLiveMessageId(
+  value: unknown,
+  role: 'assistant' | 'user',
+  notificationMetadata?: unknown,
+): string | undefined {
+  const update = readRecord(value);
+  if (!update) return undefined;
+  const updateMetadata = readRecord(update._meta);
+  const outerMetadata = readRecord(notificationMetadata);
+  return readString(update.messageId)
+    ?? readTurnMessageId(role, updateMetadata, outerMetadata)
+    ?? readString(updateMetadata?.eventId)
+    ?? readString(outerMetadata?.eventId);
+}
+
+function readTurnMessageId(
+  role: 'assistant' | 'user',
+  updateMetadata: Record<string, unknown> | null,
+  outerMetadata: Record<string, unknown> | null,
+): string | undefined {
+  return readString(updateMetadata?.promptId)
     ?? readString(outerMetadata?.promptId)
     ?? (typeof updateMetadata?.promptIndex === 'number'
       ? `${role}-${updateMetadata.promptIndex}`

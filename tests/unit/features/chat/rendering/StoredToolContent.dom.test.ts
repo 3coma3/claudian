@@ -9,7 +9,7 @@ import {
   renderToolCall,
   updateToolCallResult,
 } from '@/features/chat/rendering/ToolCallRenderer';
-import { renderStoredWriteEdit } from '@/features/chat/rendering/WriteEditRenderer';
+import { createWriteEditBlock, finalizeWriteEditBlock, renderStoredWriteEdit,updateWriteEditWithDiff } from '@/features/chat/rendering/WriteEditRenderer';
 
 HTMLElement.prototype.empty = function () { this.replaceChildren(); };
 HTMLElement.prototype.addClass = function (...classes) { this.classList.add(...classes); };
@@ -130,7 +130,7 @@ describe.each(['completed', 'error', 'blocked'] as const)('stored %s output', (s
   });
 });
 
-it('keeps running stored tools and live result updates eager', () => {
+it('keeps running stored tools and expanded live result updates eager', () => {
   const tool: ToolCallInfo = {
     id: 'running-bash',
     name: 'Bash',
@@ -148,7 +148,7 @@ it('keeps running stored tools and live result updates eager', () => {
   expect(runningEdit.querySelector('.claudian-write-edit-content')?.childElementCount).toBeGreaterThan(0);
 
   const liveElements = new Map<string, HTMLElement>();
-  const live = renderToolCall(parent, tool, liveElements);
+  const live = renderToolCall(parent, tool, liveElements, { initiallyExpanded: true });
   tool.status = 'completed';
   tool.result = 'finished output';
   updateToolCallResult(tool.id, tool, liveElements);
@@ -195,4 +195,82 @@ it('keeps restored apply_patch statistics available before rendering its diff', 
   fireEvent.keyDown(header, { key: ' ' });
   expect(Array.from(content.querySelectorAll('.claudian-diff-text'), el => el.textContent))
     .toEqual(['old', 'new']);
+});
+
+it('renders only the latest live output when expanded and keeps expanded updates current', async () => {
+  const tool: ToolCallInfo = { id: 'live', name: 'Bash', input: { command: 'echo fixture' }, status: 'running' };
+  const elements = new Map<string, HTMLElement>();
+  const block = renderToolCall(document.body.createDiv(), tool, elements);
+  const content = block.querySelector<HTMLElement>('.claudian-tool-content')!;
+  const header = within(block).getByRole('button');
+  for (let index = 0; index < 20; index++) {
+    tool.result = `Output ${index}`;
+    updateToolCallResult(tool.id, tool, elements);
+  }
+  expect(content.childElementCount).toBe(0);
+  fireEvent.keyDown(header, { key: 'Enter' });
+  expect(content.textContent).toContain('Output 19');
+  tool.result = 'Latest output';
+  updateToolCallResult(tool.id, tool, elements);
+  expect(content.textContent).toContain('Latest output');
+  fireEvent.click(header);
+  const rendered = content.firstElementChild;
+  const final = { ...tool, status: 'error' as const, result: 'Final failure' };
+  updateToolCallResult(tool.id, final, elements);
+  expect(content.firstElementChild).toBe(rendered);
+  fireEvent.keyDown(header, { key: ' ' });
+  expect(content.textContent).toContain('Final failure');
+  expect(final.isExpanded).toBe(true);
+  expect((await axe(block)).violations).toEqual([]);
+});
+
+it('defers live diff rows while keeping statistics and final status current', () => {
+  const tool: ToolCallInfo = { id: 'live-edit', name: 'Edit', input: { file_path: 'fixture.md' }, status: 'running' };
+  const state = createWriteEditBlock(document.body.createDiv(), tool);
+  const diff = { filePath: 'fixture.md', diffLines: [{ type: 'insert' as const, text: 'first', newLineNum: 1 }], stats: { added: 1, removed: 0 } };
+  updateWriteEditWithDiff(state, diff);
+  expect(state.statsEl.textContent).toContain('+1');
+  expect(state.contentEl.querySelector('.claudian-diff-text')).toBeNull();
+  fireEvent.click(state.headerEl);
+  expect(state.contentEl.textContent).toContain('first');
+  fireEvent.click(state.headerEl);
+  updateWriteEditWithDiff(state, { ...diff, diffLines: [{ type: 'insert', text: 'latest', newLineNum: 1 }] });
+  finalizeWriteEditBlock(state, true);
+  expect(state.wrapperEl.classList.contains('error')).toBe(true);
+  expect(state.contentEl.textContent).not.toContain('latest');
+  fireEvent.keyDown(state.headerEl, { key: 'Enter' });
+  expect(state.contentEl.textContent).toContain('latest');
+});
+
+
+it.each(['raw', 'value'])('renders stored exec %s source safely with a Script header and separate output', async (key) => {
+  const source = '// @exec: {"yield_time_ms": 1000}\nconst label = `<img src=x onerror=alert(1)>`;\ntext(label);';
+  const block = renderStoredToolCall(document.body.createDiv(), {
+    id: 'script', name: 'exec', input: { [key]: source }, status: 'completed', result: 'Script fixture complete',
+  });
+  const header = within(block).getByRole('button', { name: /Script: const label/ });
+  expect(header.textContent).not.toContain('@exec');
+  expect(block.querySelector('code')).toBeNull();
+  fireEvent.keyDown(header, { key: 'Enter' });
+  expect(within(block).getByText('JavaScript')).toBeDefined();
+  expect(block.querySelector('code')?.textContent).toBe(source);
+  expect(block.querySelector('img')).toBeNull();
+  expect(within(block).getByText('Output')).toBeDefined();
+  expect(within(block).getByText('Script fixture complete')).toBeDefined();
+  expect((await axe(block)).violations).toEqual([]);
+});
+
+it('shows live Script source before output, then preserves it through completion and failure', () => {
+  const source = 'const values = [1, 2, 3]; text(values.map(n => n * 2));';
+  const tool: ToolCallInfo = { id: 'script', name: 'exec', input: { raw: source }, status: 'running' };
+  const elements = new Map<string, HTMLElement>();
+  const block = renderToolCall(document.body.createDiv(), tool, elements, { initiallyExpanded: true });
+  expect(block.querySelector('code')?.textContent).toBe(source);
+  expect(within(block).getByText('Running...')).toBeDefined();
+  for (const status of ['running', 'completed', 'error'] as const) {
+    const updated = { ...tool, status, result: status === 'error' ? 'Script error: fixture failure' : '[2,4,6]' };
+    updateToolCallResult(tool.id, updated, elements);
+    expect(block.querySelector('code')?.textContent).toBe(source);
+    expect(within(block).getByText(updated.result)).toBeDefined();
+  }
 });

@@ -4,14 +4,13 @@ import type {
   ProviderCommandListContext,
 } from '../../../core/providers/commands/ProviderCommandCatalog';
 import type { ProviderCommandEntry } from '../../../core/providers/commands/ProviderCommandEntry';
-import type { ProviderVaultEntryRepository } from '../../../core/providers/commands/ProviderVaultEntryRepository';
 import type { SlashCommand } from '../../../core/types';
 import { isSkill } from '../../../utils/slashCommand';
-import type { SkillStorage } from '../storage/SkillStorage';
-import type { SlashCommandStorage } from '../storage/SlashCommandStorage';
 
 function slashCommandToEntry(cmd: SlashCommand): ProviderCommandEntry {
   const skill = isSkill(cmd);
+  // Claude Code owns every command it reports; only Claudian-authored vault commands are editable.
+  const native = cmd.source === 'sdk' || cmd.source === 'builtin';
   return {
     id: cmd.id,
     providerId: 'claude',
@@ -27,31 +26,12 @@ function slashCommandToEntry(cmd: SlashCommand): ProviderCommandEntry {
     context: cmd.context,
     agent: cmd.agent,
     hooks: cmd.hooks,
-    scope: cmd.source === 'sdk' ? 'runtime' : 'vault',
+    scope: cmd.source === 'builtin' ? 'builtin' : native ? 'runtime' : 'vault',
     source: cmd.source ?? 'user',
-    isEditable: cmd.source !== 'sdk',
-    isDeletable: cmd.source !== 'sdk',
+    isEditable: !native,
+    isDeletable: !native,
     displayPrefix: '/',
     insertPrefix: '/',
-  };
-}
-
-function entryToSlashCommand(entry: ProviderCommandEntry): SlashCommand {
-  return {
-    id: entry.id,
-    name: entry.name,
-    description: entry.description,
-    content: entry.content,
-    argumentHint: entry.argumentHint,
-    allowedTools: entry.allowedTools,
-    model: entry.model,
-    disableModelInvocation: entry.disableModelInvocation,
-    userInvocable: entry.userInvocable,
-    context: entry.context,
-    agent: entry.agent,
-    hooks: entry.hooks,
-    source: entry.source,
-    kind: entry.kind,
   };
 }
 
@@ -61,6 +41,9 @@ const BUILTIN_HIDDEN_COMMANDS = new Set([
   'insights', 'loop', 'schedule', 'security-review', 'simplify', 'update-config',
 ]);
 
+// A cold CLI start plus capped MCP startup can exceed the shared picker deadline.
+const CLAUDE_COMMAND_DISCOVERY_TIMEOUT_MS = 30_000;
+
 export type CommandProbe = (signal?: AbortSignal) => Promise<SlashCommand[]>;
 
 interface ActiveCommandProbe {
@@ -69,7 +52,7 @@ interface ActiveCommandProbe {
   resolveCompletion(): void;
 }
 
-export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVaultEntryRepository {
+export class ClaudeCommandCatalog implements ProviderCommandCatalog {
   private readonly activeProbes = new Set<ActiveCommandProbe>();
   private cacheGeneration = 0;
   private commandSnapshot: SlashCommand[] = [];
@@ -80,15 +63,11 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
   private probePromise: Promise<SlashCommand[]> | null = null;
   private transitionActive = false;
 
-  constructor(
-    private commandStorage: SlashCommandStorage,
-    private skillStorage: SkillStorage,
-    private probe?: CommandProbe,
-  ) {}
+  constructor(private probe?: CommandProbe) {}
 
   setCommandSnapshot(commands: SlashCommand[]): void {
     if (this.probesBlocked) return;
-    this.invalidateProbeCache();
+    this.#invalidateProbeCache();
     this.commandSnapshot = commands.map(command => ({ ...command }));
   }
 
@@ -102,32 +81,28 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
       if (allowCachedCommandSnapshot && this.commandSnapshot.length > 0) {
         commands = this.commandSnapshot;
       } else {
-        const probedCommands = await this.ensureProbed(context.signal);
+        const probedCommands = await this.#ensureProbed(context.signal);
         commands = allowCachedCommandSnapshot && this.commandSnapshot.length > 0
           ? this.commandSnapshot
           : probedCommands;
       }
     }
-    const runtimeEntries = commands
+    return commands
       .filter(cmd => !BUILTIN_HIDDEN_COMMANDS.has(cmd.name.toLowerCase()))
       .map(slashCommandToEntry);
-    if (runtimeEntries.length > 0) {
-      return runtimeEntries;
-    }
-    return this.listVaultEntries(context.signal);
   }
 
   /** Probe the SDK for commands. Deduplicates concurrent calls. */
-  private async ensureProbed(signal?: AbortSignal): Promise<SlashCommand[]> {
+  async #ensureProbed(signal?: AbortSignal): Promise<SlashCommand[]> {
     signal?.throwIfAborted();
     if (this.probesBlocked) return [];
     if (this.probedCommands) return this.probedCommands;
     if (!this.probe) return [];
     if (signal) {
-      return await this.runProbe(signal);
+      return await this.#runProbe(signal);
     }
     if (!this.probePromise) {
-      const probePromise = this.runProbe().finally(() => {
+      const probePromise = this.#runProbe().finally(() => {
         if (this.probePromise === probePromise) {
           this.probePromise = null;
         }
@@ -137,7 +112,7 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
     return await this.probePromise;
   }
 
-  private async runProbe(signal?: AbortSignal): Promise<SlashCommand[]> {
+  async #runProbe(signal?: AbortSignal): Promise<SlashCommand[]> {
     const generation = this.cacheGeneration;
     let resolveCompletion!: () => void;
     const entry: ActiveCommandProbe = {
@@ -156,41 +131,15 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
       if (this.disposed || generation !== this.cacheGeneration) return [];
       this.probedCommands = commands.map(command => ({ ...command }));
       return this.probedCommands;
-    } catch {
+    } catch (error) {
       signal?.throwIfAborted();
       if (this.disposed || generation !== this.cacheGeneration) return [];
-      this.probedCommands = [];
-      return this.probedCommands;
+      // Failures stay uncached so a retry re-probes.
+      throw error;
     } finally {
       signal?.removeEventListener('abort', onAbort);
       this.activeProbes.delete(entry);
       entry.resolveCompletion();
-    }
-  }
-
-  async listVaultEntries(signal?: AbortSignal): Promise<ProviderCommandEntry[]> {
-    signal?.throwIfAborted();
-    const commands = await this.commandStorage.loadAll();
-    signal?.throwIfAborted();
-    const skills = await this.skillStorage.loadAll();
-    signal?.throwIfAborted();
-    return [...commands, ...skills].map(slashCommandToEntry);
-  }
-
-  async saveVaultEntry(entry: ProviderCommandEntry): Promise<void> {
-    const cmd = entryToSlashCommand(entry);
-    if (entry.kind === 'skill') {
-      await this.skillStorage.save(cmd);
-    } else {
-      await this.commandStorage.save(cmd);
-    }
-  }
-
-  async deleteVaultEntry(entry: ProviderCommandEntry): Promise<void> {
-    if (entry.kind === 'skill') {
-      await this.skillStorage.delete(entry.id);
-    } else {
-      await this.commandStorage.delete(entry.id);
     }
   }
 
@@ -201,6 +150,7 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
       builtInPrefix: '/',
       skillPrefix: '/',
       commandPrefix: '/',
+      discoveryTimeoutMs: CLAUDE_COMMAND_DISCOVERY_TIMEOUT_MS,
     };
   }
 
@@ -211,7 +161,7 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
   async quiesceForEnvironmentChange(): Promise<void> {
     this.quiescenceDepth += 1;
     try {
-      await this.drainProbes();
+      await this.#drainProbes();
     } finally {
       this.quiescenceDepth -= 1;
     }
@@ -219,16 +169,16 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
 
   async beginEnvironmentTransition(): Promise<void> {
     this.transitionActive = true;
-    await this.drainProbes();
+    await this.#drainProbes();
   }
 
   endEnvironmentTransition(): void {
     this.transitionActive = false;
   }
 
-  private async drainProbes(): Promise<void> {
+  async #drainProbes(): Promise<void> {
     const sharedProbe = this.probePromise;
-    this.invalidateProbeCache();
+    this.#invalidateProbeCache();
     this.commandSnapshot = [];
     const active = [...this.activeProbes];
     await Promise.all([
@@ -244,7 +194,7 @@ export class ClaudeCommandCatalog implements ProviderCommandCatalog, ProviderVau
     return this.disposePromise;
   }
 
-  private invalidateProbeCache(): void {
+  #invalidateProbeCache(): void {
     this.cacheGeneration += 1;
     this.probedCommands = null;
     for (const entry of this.activeProbes) {

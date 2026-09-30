@@ -7,28 +7,16 @@ import './providers';
 
 StartupProfiler.finishModuleEvaluation();
 
-import { isCollabOpaqueId, isCollabProjectId } from '@claudian-collab/protocol';
 import type { Editor, TAbstractFile, WorkspaceLeaf } from 'obsidian';
-import { MarkdownView, normalizePath, Notice, Plugin, TFile, TFolder } from 'obsidian';
+import { ItemView, MarkdownView, Notice, Plugin, TFolder } from 'obsidian';
 
-import type {
-  LocalAgentRuntimeHttpServer,
-  LocalAgentRuntimeHttpServerEndpoint,
-} from './app/agent-runtime';
-import type {
-  ClaudianCollabService,
-  CollabFeatureService,
-} from './app/collab';
-import type {
-  GitRuntimeResolution,
-  GitRuntimeResolver,
-} from './app/collab/git/GitRuntimeResolver';
-import { CollabComposerReferenceService } from './app/CollabComposerReferenceService';
 import { ConversationRepository } from './app/conversations/ConversationRepository';
-import { ClaudianProviderHost } from './app/providers/ClaudianProviderHost';
+import { SessionMetadataLoader } from './app/conversations/SessionMetadataLoader';
 import { ChatModelSelectionCoordinator } from './app/settings/ChatModelSelectionCoordinator';
 import { DEFAULT_CLAUDIAN_SETTINGS } from './app/settings/defaultSettings';
 import { PinnedLinkedContentPathCoordinator } from './app/settings/PinnedLinkedContentPathCoordinator';
+import { RuntimeSettingsCoordinator } from './app/settings/RuntimeSettingsCoordinator';
+import { migrateSelectedModelMetadata } from './app/settings/SelectedModelMetadataMigration';
 import type {
   ConditionalSettingsMutation,
   SettingsCommit,
@@ -36,45 +24,35 @@ import type {
 import {
   SettingsCoordinator,
   type SettingsMutation,
-  SettingsPostCommitError,
 } from './app/settings/SettingsCoordinator';
 import { SharedStorageService } from './app/storage/SharedStorageService';
 import { TabWorkspaceMigrationCoordinator } from './app/storage/TabWorkspaceMigrationCoordinator';
-import type { SessionMetadataReadResult } from './core/bootstrap/SessionStorage';
-import type { SharedAppStorage } from './core/bootstrap/storage';
-import {
-  type CollabCoordinationSnapshot,
-  type CollabPublicationReview,
-  type CollabRequestReview,
-  parseCollabProjectsFolder,
-} from './core/collab';
+import { ClaudianProviderHost } from './composition/ClaudianProviderHost';
+import { isClaudianView } from './composition/claudianViews';
 import {
   ProviderExecutionLifecycleRegistry,
   type ProviderExecutionTransitionScope,
 } from './core/execution';
+import { resolveConversationModel } from './core/providers/conversationModel';
 import {
   getEnvironmentVariablesForScope as getScopedEnvironmentVariables,
   getRuntimeEnvironmentText,
   setEnvironmentVariablesForScope,
 } from './core/providers/providerEnvironment';
 import { ProviderRegistry } from './core/providers/ProviderRegistry';
-import {
-  ProviderSettingsCoordinator,
-  type SettingsReconciliationResult,
-} from './core/providers/ProviderSettingsCoordinator';
+import { ProviderSettingsCoordinator } from './core/providers/ProviderSettingsCoordinator';
 import { ProviderWorkspaceRegistry } from './core/providers/ProviderWorkspaceRegistry';
 import type {
   AppTabManagerState,
-  ProviderCliResolutionContext,
+  ProviderCLIResolutionContext,
   ProviderId,
 } from './core/providers/types';
-import { DEFAULT_CHAT_PROVIDER_ID } from './core/providers/types';
+import { normalizeWarmExecutionLimit } from './core/settings/warmExecutionLimits';
 import type {
   ClaudianSettings,
   Conversation,
   ConversationMeta,
   ConversationMutablePatch,
-  SessionMetadata,
 } from './core/types';
 import {
   VIEW_TYPE_CLAUDIAN,
@@ -82,146 +60,45 @@ import {
 import type { ChatViewPlacement, EnvironmentScope } from './core/types/settings';
 import { ClaudianView } from './features/chat/ClaudianView';
 import type { ChatExecutionPersistence } from './features/chat/execution/ChatExecutionCoordinator';
-import {
-  DEFAULT_MAX_WARM_AGENT_PROCESSES,
-  normalizeWarmExecutionLimit,
-  WarmExecutionPool,
-} from './features/chat/execution/WarmExecutionPool';
+import { WarmExecutionPool } from './features/chat/execution/WarmExecutionPool';
 import { registerFileMenu } from './features/chat/fileMenu';
-import {
-  COLLAB_DETAIL_VIEW_TYPE,
-  CollabDetailView,
-  CollabDetailViewCoordinator,
-  type CollabDetailViewPort,
-} from './features/collab/detail/CollabDetailView';
-import { preloadCollabDiffRenderer } from './features/collab/detail/review/CollabDiffRenderer';
-import { CollabPreparedReviewCache } from './features/collab/handoff/CollabPreparedReviewCache';
-import { CollabTransientSurfaceRegistry } from './features/collab/modals/CollabTransientSurfaceRegistry';
-import {
-  ResponsiveCollabRouter,
-  type ResponsiveCollabTarget,
-} from './features/collab/navigation/ResponsiveCollabRouter';
-import { DeferredCollabSurfaceController } from './features/collab/sidebar/DeferredCollabSurfaceController';
-import type { GitSetupResolution } from './features/collab/sidebar/GitSetupPanel';
-import type { CollabSidebarSurfaceFactory } from './features/FeatureHost';
+import type { ZenModeSource } from './features/chat/zen/types';
+import { ZenModeController } from './features/chat/zen/ZenModeController';
+import { InlineEditSessionOwner } from './features/inline-edit/InlineEditSessionOwner';
 import { type InlineEditContext, InlineEditModal } from './features/inline-edit/ui/InlineEditModal';
 import { ClaudianSettingTab } from './features/settings/ClaudianSettings';
-import { setLocale, t } from './i18n/i18n';
+import { setLocale } from './i18n/i18n';
 import type { Locale } from './i18n/types';
-import { deleteLegacyMcpConfig } from './providers/claude/storage/LegacyMcpConfigCleanup';
+import { deleteLegacyMCPConfig } from './providers/claude/storage/LegacyMCPConfigCleanup';
 import { buildCursorContext } from './utils/editor';
-import { getInstallationKey } from './utils/env';
 import { revealWorkspaceLeaf } from './utils/obsidianCompat';
 import { getVaultPath } from './utils/path';
 
-function isClaudianView(value: unknown): value is ClaudianView {
-  return !!value
-    && typeof value === 'object'
-    && typeof (value as { getTabManager?: unknown }).getTabManager === 'function';
-}
-
-function toGitSetupResolution(resolution: GitRuntimeResolution): GitSetupResolution {
-  if (resolution.status === 'available') {
-    return { status: 'available', version: resolution.runtime.version.raw };
-  }
-  if (resolution.status === 'incompatible') {
-    return {
-      missingCapabilities: resolution.missingCapabilities,
-      status: 'incompatible',
-    };
-  }
-  return { status: 'missing' };
-}
-
-function readPendingProviderSessionInvalidations(
-  settings: Record<string, unknown>,
-): Map<ProviderId, number> {
-  const registeredProviderIds = new Set(ProviderRegistry.getRegisteredProviderIds());
-  const value = settings.pendingProviderSessionInvalidations;
-  const pending = new Map<ProviderId, number>();
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return pending;
-  }
-
-  for (const [providerId, generation] of Object.entries(value)) {
-    if (
-      registeredProviderIds.has(providerId)
-      && typeof generation === 'number'
-      && Number.isSafeInteger(generation)
-      && generation > 0
-    ) {
-      pending.set(providerId, generation);
-    }
-  }
-  return pending;
-}
-
-function serializePendingProviderSessionInvalidations(
-  pending: ReadonlyMap<ProviderId, number>,
-): Partial<Record<string, number>> {
-  return Object.fromEntries(
-    Array.from(pending.entries()).sort(([left], [right]) => left.localeCompare(right)),
-  );
-}
-
-function hasSamePendingProviderSessionInvalidations(
-  value: unknown,
-  pending: ReadonlyMap<ProviderId, number>,
-): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return false;
-  }
-  const entries = Object.entries(value);
-  return entries.length === pending.size
-    && entries.every(([providerId, generation]) => pending.get(providerId) === generation);
-}
-
 export default class ClaudianPlugin extends Plugin {
   settings!: ClaudianSettings;
-  storage!: SharedAppStorage;
+  storage!: SharedStorageService;
   readonly executionLifecycleRegistry = new ProviderExecutionLifecycleRegistry();
+  private settingsTab: ClaudianSettingTab | null = null;
   readonly providerHost = new ClaudianProviderHost(this);
   readonly warmExecutionPool = new WarmExecutionPool(
-    () => this.settings?.maxWarmAgentProcesses ?? DEFAULT_MAX_WARM_AGENT_PROCESSES,
+    () => normalizeWarmExecutionLimit(this.settings?.maxWarmAgentProcesses),
   );
-  readonly collabSurfaceFactory: CollabSidebarSurfaceFactory = {
-    create: (hostEl, leaf) => this.createCollabSurface(hostEl, leaf),
-  };
-  readonly collabComposerReferences = new CollabComposerReferenceService(
-    () => this.getCollabFeatureService(),
-    () => this.isCollabEnabled(),
-  );
-  private collabFoundation: ClaudianCollabService | null = null;
-  private collabSettingsGitResolver: GitRuntimeResolver | null = null;
-  private collabFeatureService: CollabFeatureService | null = null;
-  private collabFeatureServicePromise: Promise<CollabFeatureService | null> | null = null;
-  private agentRuntime: LocalAgentRuntimeHttpServer | null = null;
-  private agentRuntimeStartPromise:
-    Promise<LocalAgentRuntimeHttpServerEndpoint | null> | null = null;
-  private collabHostRestore: Promise<void> | null = null;
-  private collabHostRestoreTimer: number | null = null;
-  private collabHostRestoreRetryDelayMs = 1_000;
-  private collabLayoutReady = false;
-  private collabLifecycleGeneration = 0;
-  private collabLifecycleTail: Promise<void> = Promise.resolve();
-  private readonly collabPreparedReviews = new CollabPreparedReviewCache();
-  private readonly collabTransientSurfaces = new CollabTransientSurfaceRegistry();
-  private collabDetailViewCoordinator: CollabDetailViewCoordinator | null = null;
   private settingsCoordinator!: SettingsCoordinator<ClaudianSettings>;
   private chatModelSelectionCoordinator!: ChatModelSelectionCoordinator;
   private pinnedLinkedContentPaths!: PinnedLinkedContentPathCoordinator;
   private conversationRepository!: ConversationRepository;
-  private pendingSessionMetadataScan = false;
-  private pendingEnvironmentInvalidationGenerations = new Map<ProviderId, number>();
-  private blockedEnvironmentInvalidationGenerations = new Map<ProviderId, number>();
+  private runtimeSettings!: RuntimeSettingsCoordinator;
   private environmentUpdateTail: Promise<void> = Promise.resolve();
   private agentSkillResourceGeneration = 0;
-  private isLoadingRemainingSessionMetadata = false;
-  private hasLoadedAllSessionMetadata = false;
-  private sessionMetadataLoadTimer: number | null = null;
-  private remainingSessionMetadataLoad: Promise<void> | null = null;
+  private sessionMetadata!: SessionMetadataLoader;
   private providerChatOptionsChangeTail: Promise<void> = Promise.resolve();
+  private readonly inlineEditSessions = new InlineEditSessionOwner();
+  private readonly zenMode = new ZenModeController({
+    app: this.app,
+    isEnabled: () => this.getCommittedSettings().enableZenMode,
+  });
   private isUnloading = false;
+  private vaultRefreshTimer: number | undefined;
   private applicationShutdownPromise: Promise<void> | null = null;
   private tabWorkspaceMigrationCoordinator!: TabWorkspaceMigrationCoordinator;
 
@@ -233,6 +110,11 @@ export default class ClaudianPlugin extends Plugin {
     return this.chatModelSelectionCoordinator;
   }
 
+  private readonly startupMaintenanceAbort = new AbortController();
+  private modelMetadataMigration: Promise<void> | null = null;
+  private sessionInputCleanup: Promise<void> | null = null;
+  private sessionInputCleanupTimer: number | null = null;
+
   async onload() {
     StartupProfiler.startOnload();
     try {
@@ -240,27 +122,12 @@ export default class ClaudianPlugin extends Plugin {
         'settings-load',
         () => this.loadSettings({ deferNonRestoredSessionMetadata: true }),
       );
+      this.zenMode.start();
       // Provider workspace services are initialized lazily on first use.
 
       this.registerView(
         VIEW_TYPE_CLAUDIAN,
         (leaf) => new ClaudianView(leaf, this)
-      );
-      this.registerView(
-        COLLAB_DETAIL_VIEW_TYPE,
-        leaf => new CollabDetailView(leaf, this.createCollabDetailViewPort(), {
-          openProjectFile: (projectId, filePath) => (
-            this.openCollabProjectFile(projectId, filePath)
-          ),
-          openTicketInNewTab: (projectId, ticketId) => (
-            this.getCollabDetailViewCoordinator().openInNewTab({
-              kind: 'ticket',
-              projectId,
-              ticketId,
-            })
-          ),
-          preparedReviews: this.collabPreparedReviews,
-        }),
       );
       registerFileMenu(this);
       this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
@@ -277,7 +144,7 @@ export default class ClaudianPlugin extends Plugin {
         for (const view of this.getAllViews()) {
           view.handleLinkedContentCreated(file.path);
         }
-        this.notifyConversationViewsChanged();
+        this.scheduleVaultRefresh();
       }));
 
       this.addRibbonIcon('bot', 'Open Claudian', () => {
@@ -292,45 +159,6 @@ export default class ClaudianPlugin extends Plugin {
         },
       });
 
-      this.addCommand({
-        id: 'open-collab',
-        name: t('collab.commands.open'),
-        checkCallback: checking => {
-          if (!this.isCollabEnabled()) return false;
-          if (!checking) void this.activateCollabSurface();
-          return true;
-        },
-      });
-
-      this.addCommand({
-        id: 'create-collab-project',
-        name: t('collab.commands.createProject'),
-        checkCallback: checking => {
-          if (!this.isCollabEnabled()) return false;
-          if (!checking) void this.openCreateCollabProject();
-          return true;
-        },
-      });
-
-      this.addCommand({
-        id: 'join-collab-project',
-        name: t('collab.commands.joinProject'),
-        checkCallback: checking => {
-          if (!this.isCollabEnabled()) return false;
-          if (!checking) void this.openJoinCollabProject();
-          return true;
-        },
-      });
-
-      this.addCommand({
-        id: 'resume-collab-project-setup',
-        name: t('collab.commands.resumeSetup'),
-        checkCallback: checking => {
-          if (!this.isCollabEnabled()) return false;
-          if (!checking) void this.resumeFirstCollabProjectSetup();
-          return true;
-        },
-      });
 
       this.addCommand({
         id: 'inline-edit',
@@ -368,6 +196,7 @@ export default class ClaudianPlugin extends Plugin {
             view,
             editContext,
             notePath,
+            this.inlineEditSessions,
           );
           const result = await modal.openAndWait();
 
@@ -443,10 +272,23 @@ export default class ClaudianPlugin extends Plugin {
         },
       });
 
-      this.addSettingTab(new ClaudianSettingTab(this.app, this));
-      this.initializeCollabLayoutLifecycle();
-      if (this.isCollabEnabled()) void this.startAgentRuntime();
-      this.scheduleRemainingSessionMetadataLoad();
+      this.settingsTab = new ClaudianSettingTab(this.app, this);
+      this.addSettingTab(this.settingsTab);
+      this.sessionMetadata.scheduleRemainingLoad();
+      this.app.workspace.onLayoutReady(() => {
+        if (this.isUnloading || this.sessionInputCleanup || this.sessionInputCleanupTimer !== null) return;
+        this.sessionInputCleanupTimer = window.setTimeout(() => {
+          this.sessionInputCleanupTimer = null;
+          if (this.isUnloading) return;
+          this.sessionInputCleanup = this.storage.cleanupObsoleteSessionInputs(this.startupMaintenanceAbort.signal);
+        }, 0);
+      });
+      this.app.workspace.onLayoutReady(() => {
+        if (this.isUnloading || this.modelMetadataMigration) return;
+        this.modelMetadataMigration = migrateSelectedModelMetadata(
+          this.providerHost, this.startupMaintenanceAbort.signal,
+        );
+      });
     } finally {
       StartupProfiler.finishOnload();
     }
@@ -454,27 +296,27 @@ export default class ClaudianPlugin extends Plugin {
 
   onunload(): void {
     this.isUnloading = true;
-    this.collabTransientSurfaces.closeAll();
-    if (this.sessionMetadataLoadTimer !== null) {
-      window.clearTimeout(this.sessionMetadataLoadTimer);
-      this.sessionMetadataLoadTimer = null;
+    // Return any zen presentation to its view before asynchronous shutdown.
+    this.zenMode.dispose();
+    window.clearTimeout(this.vaultRefreshTimer);
+    this.vaultRefreshTimer = undefined;
+    this.startupMaintenanceAbort.abort();
+    if (this.sessionInputCleanupTimer !== null) {
+      window.clearTimeout(this.sessionInputCleanupTimer);
+      this.sessionInputCleanupTimer = null;
     }
-    if (this.collabHostRestoreTimer !== null) {
-      window.clearTimeout(this.collabHostRestoreTimer);
-      this.collabHostRestoreTimer = null;
-    }
+    this.inlineEditSessions.dispose();
     StartupProfiler.freeze();
     this.applicationShutdownPromise ??= this.shutdownApplication();
     void this.applicationShutdownPromise.catch(() => undefined);
   }
 
   private async shutdownApplication(): Promise<void> {
-    const featureConstruction = this.collabFeatureServicePromise;
-    const featureClose = this.collabFeatureService?.close();
-    const agentRuntimeClose = this.agentRuntime?.close().catch(() => undefined);
-    await Promise.allSettled(
-      this.getAllViews().map(view => view.prepareForPluginUnload()),
-    );
+    await Promise.allSettled([
+      this.sessionMetadata?.dispose(),
+      this.sessionInputCleanup,
+      ...this.getAllViews().map(view => view.prepareForPluginUnload()),
+    ]);
     try {
       await this.executionLifecycleRegistry.dispose();
     } catch {
@@ -485,27 +327,7 @@ export default class ClaudianPlugin extends Plugin {
     } catch {
       // Obsidian teardown has no error channel; workspace cleanup is best effort.
     }
-    await agentRuntimeClose;
-    try {
-      await this.agentRuntime?.waitForWriteInvocations();
-    } catch {
-      // Continue cleanup if write-settlement tracking fails unexpectedly.
-    }
-    try {
-      this.collabComposerReferences.dispose();
-    } catch {
-      // Continue closing the Collab foundation if feature cleanup fails.
-    }
-    const constructedFeature = await featureConstruction?.catch(() => null);
-    await constructedFeature?.close().catch(() => undefined);
-    await featureClose?.catch(() => undefined);
-    await this.collabHostRestore?.catch(() => undefined);
-    this.collabPreparedReviews.clear();
-    try {
-      await this.collabFoundation?.close();
-    } catch {
-      // Obsidian teardown has no error channel; Collab cleanup is best effort.
-    }
+    await this.modelMetadataMigration;
   }
 
   async activateView() {
@@ -537,592 +359,6 @@ export default class ClaudianPlugin extends Plugin {
     } finally {
       workspace.offref(focusIntentRef);
     }
-  }
-
-  private async activateCollabSurface(): Promise<boolean> {
-    if (!this.isCollabEnabled()) return false;
-    const router = new ResponsiveCollabRouter({
-      createMainTabTarget: async () => {
-        const leaf = this.app.workspace.getLeaf('tab');
-        if (!leaf) return null;
-        await leaf.setViewState({ active: true, type: VIEW_TYPE_CLAUDIAN });
-        const view = leaf.view;
-        if (!isClaudianView(view)) return null;
-        return {
-          prepare: async () => {
-            view.refreshDualPaneLayout();
-          },
-          reveal: () => revealWorkspaceLeaf(this.app.workspace, leaf),
-          select: () => view.selectCollabSurface(),
-        } satisfies ResponsiveCollabTarget;
-      },
-      listExistingTargets: () => this.app.workspace
-        .getLeavesOfType(VIEW_TYPE_CLAUDIAN)
-        .flatMap(leaf => {
-          const view = leaf.view;
-          return isClaudianView(view) ? [{
-            reveal: () => revealWorkspaceLeaf(this.app.workspace, leaf),
-            select: () => view.selectCollabSurface(),
-          } satisfies ResponsiveCollabTarget] : [];
-        }),
-    });
-    return router.open();
-  }
-
-  private createCollabSurface(
-    hostEl: HTMLElement,
-    leaf: WorkspaceLeaf,
-  ) {
-    return new DeferredCollabSurfaceController(hostEl, {
-      create: async () => {
-        if (!this.isCollabEnabled()) {
-          throw new Error('Collab is disabled in this Vault.');
-        }
-        const initialGitResolution = this.resolveCollabGit(false);
-        void initialGitResolution.catch(() => undefined);
-        const [feature, panelModule] = await Promise.all([
-          this.getCollabFeatureService(),
-          import('./features/collab/sidebar/CollabPanel'),
-        ]);
-        if (!this.isCollabEnabled()) {
-          throw new Error('Collab was disabled while loading.');
-        }
-        if (!feature) {
-          const unavailable = hostEl.createDiv({ cls: 'claudian-collab-panel-status' });
-          unavailable.setText(t('collab.notices.desktopRequired'));
-          return {
-            destroy: () => unavailable.remove(),
-            setActive: () => undefined,
-          };
-        }
-        return new panelModule.CollabPanel(hostEl, leaf, {
-          app: this.app,
-          configuredGitPath: () => this.settings.collabGitPath ?? '',
-          copyText: text => navigator.clipboard.writeText(text),
-          initialGitResolution,
-          onOpenConflict: (project, operationId, location, requestId) => {
-            void this.openCollabConflict(project.id, operationId, location, requestId);
-          },
-          onCreateTicket: project => {
-            void this.getCollabDetailViewCoordinator().open({
-              kind: 'ticket',
-              projectId: project.id,
-            });
-          },
-          onOpenRequest: (project, review, coordination, selectedPath) => {
-            void this.openPreparedCollabReview(
-              project.id,
-              review,
-              coordination,
-              selectedPath,
-            );
-          },
-          onReviewIntent: () => {
-            void preloadCollabDiffRenderer().catch(() => undefined);
-          },
-          onOpenPublicationReview: (project, review, selectedPath) => {
-            void this.openPreparedCollabPublicationReview(
-              project.id,
-              review,
-              selectedPath,
-            );
-          },
-          onOpenTicket: (project, ticketId) => {
-            return this.getCollabDetailViewCoordinator().open({
-              kind: 'ticket',
-              projectId: project.id,
-              ticketId,
-            });
-          },
-          onOpenWorkingTreeReview: (project, review, selectedPath) => {
-            void this.getCollabDetailViewCoordinator().open({
-              baseOid: review.baseOid,
-              headOid: review.headOid,
-              kind: 'working-tree',
-              projectId: project.id,
-              selectedPath,
-              snapshotId: review.snapshotId,
-            });
-          },
-          onSaveConfiguredGitPath: path => this.saveCollabGitPath(path),
-          port: feature,
-          preparedReviews: this.collabPreparedReviews,
-          projectSetup: feature,
-          resolveGit: rescan => this.resolveCollabGit(rescan),
-          ticketFocus: {
-            read: () => this.readCollabTicketFocus(),
-            subscribe: listener => {
-              const layoutChange = this.app.workspace.on('layout-change', listener);
-              const activeLeafChange = this.app.workspace.on(
-                'active-leaf-change',
-                listener,
-              );
-              return {
-                dispose: () => {
-                  this.app.workspace.offref(layoutChange);
-                  this.app.workspace.offref(activeLeafChange);
-                },
-              };
-            },
-          },
-          transientSurfaces: this.collabTransientSurfaces,
-        });
-      },
-      errorText: t('collab.panel.loadFailed'),
-      loadingText: t('collab.panel.loading'),
-    });
-  }
-
-  private readCollabTicketFocus(): {
-    readonly projectId: string;
-    readonly ticketId: string;
-  } | null {
-    const leaf = this.app.workspace.getMostRecentLeaf();
-    const viewState = leaf?.getViewState();
-    if (viewState?.type !== COLLAB_DETAIL_VIEW_TYPE) return null;
-    const state = viewState.state;
-    if (
-      state?.kind !== 'ticket'
-      || !isCollabProjectId(state.projectId)
-      || !isCollabOpaqueId(state.ticketId)
-    ) return null;
-    return {
-      projectId: state.projectId,
-      ticketId: state.ticketId,
-    };
-  }
-
-  private getCollabFeatureService(): Promise<CollabFeatureService | null> {
-    if (!this.isCollabEnabled()) return Promise.resolve(null);
-    if (this.collabFeatureService) {
-      return Promise.resolve(this.collabFeatureService);
-    }
-    const pending = this.collabFeatureServicePromise ?? this.createCollabFeatureService();
-    if (!this.collabFeatureServicePromise) {
-      this.collabFeatureServicePromise = pending;
-      const clearPending = () => {
-        if (this.collabFeatureServicePromise === pending) {
-          this.collabFeatureServicePromise = null;
-        }
-      };
-      void pending.then(clearPending, clearPending);
-    }
-    return pending;
-  }
-
-  private async createCollabFeatureService(): Promise<CollabFeatureService | null> {
-    const generation = this.collabLifecycleGeneration;
-    const vaultRoot = getVaultPath(this.app);
-    if (vaultRoot === null) return null;
-    const collab = await import('./app/collab');
-    if (!this.isCollabEnabled() || generation !== this.collabLifecycleGeneration) return null;
-    const installationKey = getInstallationKey();
-    const foundation = new collab.ClaudianCollabService({
-      getConfiguredGitPath: () => this.settings.collabGitPath ?? '',
-      getProjectsFolder: () => this.settings.collabProjectsFolder,
-      installationKey,
-      obsidianConfigDirectory: this.app.vault.configDir,
-      vaultRoot,
-    });
-    const projectSetup = new collab.CollabProjectSetupService(foundation, {
-      getProjectsFolder: () => this.settings.collabProjectsFolder,
-      installationKey,
-      vaultRoot,
-    });
-    const { feature } = collab.createCollabFeatureSubcomposition({
-      foundation,
-      projectSetup,
-      vaultRoot,
-    });
-    try {
-      await feature.prepareCloudBootstrapLocalRecovery();
-    } catch (error) {
-      await Promise.allSettled([feature.close(), foundation.close()]);
-      throw error;
-    }
-    if (!this.isCollabEnabled() || generation !== this.collabLifecycleGeneration) {
-      await feature.close();
-      await foundation.close();
-      return null;
-    }
-    this.collabFoundation = foundation;
-    this.collabFeatureService = feature;
-    void feature.recoverPendingCloudBootstraps().catch(() => undefined);
-    return feature;
-  }
-
-  async getMainAgentDynamicSystemPromptSections(): Promise<readonly string[]> {
-    if (!this.isCollabEnabled()) return [];
-    const endpoint = await this.startAgentRuntime();
-    if (!endpoint || !this.isCollabEnabled()) return [];
-    const runtime = await import('./app/agent-runtime');
-    if (!this.isCollabEnabled()) return [];
-    return [runtime.buildCollabModeSystemPrompt(endpoint)];
-  }
-
-  private startAgentRuntime(): Promise<LocalAgentRuntimeHttpServerEndpoint | null> {
-    if (!this.isCollabEnabled()) return Promise.resolve(null);
-    if (this.agentRuntimeStartPromise) return this.agentRuntimeStartPromise;
-    const pending = (async (): Promise<LocalAgentRuntimeHttpServerEndpoint | null> => {
-      try {
-        let runtime = this.agentRuntime;
-        if (!runtime) {
-          const vaultRoot = getVaultPath(this.app);
-          if (vaultRoot === null) return null;
-          const agentRuntime = await import('./app/agent-runtime');
-          if (!this.isCollabEnabled()) return null;
-          runtime = new agentRuntime.LocalAgentRuntimeHttpServer(
-            new agentRuntime.AgentRuntimeGateway(
-              () => this.getCollabFeatureService(),
-            ),
-            {
-              portCandidates: agentRuntime.deriveAgentRuntimePortCandidates(vaultRoot),
-            },
-          );
-          this.agentRuntime = runtime;
-        }
-        const endpoint = await runtime.start();
-        if (this.isCollabEnabled()) return endpoint;
-        await runtime.close();
-        return null;
-      } catch {
-        return null;
-      }
-    })();
-    this.agentRuntimeStartPromise = pending;
-    void pending.then(endpoint => {
-      if (
-        endpoint === null
-        && this.isCollabEnabled()
-        && this.agentRuntimeStartPromise === pending
-      ) {
-        this.agentRuntimeStartPromise = null;
-      }
-    });
-    return pending;
-  }
-
-  private async resolveCollabGit(rescan: boolean): Promise<GitSetupResolution> {
-    const feature = await this.getCollabFeatureService();
-    if (!feature || !this.collabFoundation) return { status: 'missing' };
-    return toGitSetupResolution(await this.collabFoundation.resolveGitRuntime(rescan));
-  }
-
-  private async saveCollabGitPath(path: string): Promise<GitSetupResolution> {
-    await this.mutateSettings(settings => {
-      settings.collabGitPath = path;
-    });
-    return this.resolveCollabGit(true);
-  }
-
-  private async openCreateCollabProject(): Promise<void> {
-    const generation = this.collabLifecycleGeneration;
-    const feature = await this.getCollabFeatureService();
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (!feature) {
-      new Notice(t('collab.notices.desktopRequired'));
-      return;
-    }
-    const resolution = await this.resolveCollabGit(false);
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (resolution.status !== 'available') {
-      await this.activateCollabSurface();
-      if (!this.isCurrentCollabLifecycle(generation)) return;
-      new Notice(t('collab.notices.createRequiresGit'));
-      return;
-    }
-    const initialized = await feature.initialize();
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (initialized.status !== 'success') {
-      new Notice(t('collab.notices.initializationFailed'));
-      return;
-    }
-    const { CreateProjectModal } = await import(
-      './features/collab/modals/project/CreateProjectModal'
-    );
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    this.collabTransientSurfaces.open(onClosed => (
-      new CreateProjectModal(this.app, feature, { onClosed })
-    ));
-  }
-
-  private async openJoinCollabProject(): Promise<void> {
-    const generation = this.collabLifecycleGeneration;
-    const feature = await this.getCollabFeatureService();
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (!feature) {
-      new Notice(t('collab.notices.desktopRequired'));
-      return;
-    }
-    const resolution = await this.resolveCollabGit(false);
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (resolution.status !== 'available') {
-      await this.activateCollabSurface();
-      if (!this.isCurrentCollabLifecycle(generation)) return;
-      new Notice(t('collab.notices.joinRequiresGit'));
-      return;
-    }
-    const initialized = await feature.initialize();
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    if (initialized.status !== 'success') {
-      new Notice(t('collab.notices.initializationFailed'));
-      return;
-    }
-    const { JoinProjectModal } = await import(
-      './features/collab/modals/project/JoinProjectModal'
-    );
-    if (!this.isCurrentCollabLifecycle(generation)) return;
-    this.collabTransientSurfaces.open(onClosed => (
-      new JoinProjectModal(this.app, feature, { onClosed })
-    ));
-  }
-
-  private isCurrentCollabLifecycle(generation: number): boolean {
-    return !this.isUnloading
-      && this.isCollabEnabled()
-      && generation === this.collabLifecycleGeneration;
-  }
-
-  private async resumeFirstCollabProjectSetup(): Promise<void> {
-    const feature = await this.getCollabFeatureService();
-    if (!feature) return;
-    const initialized = await feature.initialize();
-    if (initialized.status !== 'success') {
-      await this.activateCollabSurface();
-      return;
-    }
-    const operationIds = await feature.listPendingSetupOperationIds();
-    for (const operationId of operationIds) {
-      const result = await feature.resumeSetup({ operationId });
-      new Notice(result.status === 'success'
-        ? t('collab.notices.setupReady', { name: result.value.name })
-        : t('collab.notices.setupNeedsAttention'));
-      return;
-    }
-    new Notice(t('collab.notices.noInterruptedSetup'));
-  }
-
-  private createCollabDetailViewPort(): CollabDetailViewPort {
-    return {
-      isDetailAdmissionOpen: () => this.collabLayoutReady,
-      acceptRequest: async (...args) => (
-        (await this.requireCollabFeatureService()).acceptRequest(...args)
-      ),
-      addComment: async (...args) => (
-        (await this.requireCollabFeatureService()).addComment(...args)
-      ),
-      addTicketComment: async (...args) => (
-        (await this.requireCollabFeatureService()).addTicketComment(...args)
-      ),
-      closeTicket: async (...args) => (
-        (await this.requireCollabFeatureService()).closeTicket(...args)
-      ),
-      confirmPublish: async (...args) => (
-        (await this.requireCollabFeatureService()).confirmPublish(...args)
-      ),
-      createTicket: async (...args) => (
-        (await this.requireCollabFeatureService()).createTicket(...args)
-      ),
-      listTickets: async (...args) => (
-        (await this.requireCollabFeatureService()).listTickets(...args)
-      ),
-      prepareReview: async (...args) => (
-        (await this.requireCollabFeatureService()).prepareReview(...args)
-      ),
-      preparePublicationReview: async (...args) => (
-        (await this.requireCollabFeatureService()).preparePublicationReview(...args)
-      ),
-      prepareWorkingTreeReview: async (...args) => (
-        (await this.requireCollabFeatureService()).prepareWorkingTreeReview(...args)
-      ),
-      publish: async (...args) => (
-        (await this.requireCollabFeatureService()).publish(...args)
-      ),
-      readConflict: async (...args) => (
-        (await this.requireCollabFeatureService()).readConflict(...args)
-      ),
-      readConflictFile: async (...args) => (
-        (await this.requireCollabFeatureService()).readConflictFile(...args)
-      ),
-      readReviewFile: async (...args) => (
-        (await this.requireCollabFeatureService()).readReviewFile(...args)
-      ),
-      readPublicationReviewFile: async (...args) => (
-        (await this.requireCollabFeatureService()).readPublicationReviewFile(...args)
-      ),
-      readWorkingTreeReviewFile: async (...args) => (
-        (await this.requireCollabFeatureService()).readWorkingTreeReviewFile(...args)
-      ),
-      readSnapshot: async (...args) => (
-        (await this.requireCollabFeatureService()).readSnapshot(...args)
-      ),
-      readPublishDescription: async (...args) => (
-        (await this.requireCollabFeatureService()).readPublishDescription(...args)
-      ),
-      readTicket: async (...args) => (
-        (await this.requireCollabFeatureService()).readTicket(...args)
-      ),
-      reopenTicket: async (...args) => (
-        (await this.requireCollabFeatureService()).reopenTicket(...args)
-      ),
-      subscribe: listener => {
-        if (!this.isCollabEnabled()) return { dispose: () => undefined };
-        let disposed = false;
-        let subscription: { dispose(): void } | null = null;
-        void this.requireCollabFeatureService().then(feature => {
-          if (disposed) return;
-          subscription = feature.subscribe(listener);
-        }).catch(() => undefined);
-        return {
-          dispose: () => {
-            disposed = true;
-            subscription?.dispose();
-          },
-        };
-      },
-      updateRequestMetadata: async (...args) => (
-        (await this.requireCollabFeatureService()).updateRequestMetadata(...args)
-      ),
-      updateTicketContent: async (...args) => (
-        (await this.requireCollabFeatureService()).updateTicketContent(...args)
-      ),
-    };
-  }
-
-  private async openCollabProjectFile(projectId: string, filePath: string): Promise<void> {
-    try {
-      const feature = await this.requireCollabFeatureService();
-      const project = feature.state.projects.find(candidate => candidate.id === projectId);
-      if (!project) throw new Error('Collab Project is unavailable');
-      const vaultPath = normalizePath(`${project.workspacePath}/${filePath}`);
-      const file = this.app.vault.getAbstractFileByPath(vaultPath);
-      if (!(file instanceof TFile)) throw new Error('Collab Project file is unavailable');
-      await this.app.workspace.getLeaf('tab').openFile(file);
-    } catch {
-      new Notice(t('collab.review.fileLoadFailed'));
-    }
-  }
-
-  private async openCollabConflict(
-    projectId: string,
-    operationId: string,
-    location: 'my-changes' | 'request',
-    requestId?: string,
-  ): Promise<void> {
-    try {
-      const feature = await this.requireCollabFeatureService();
-      const result = await feature.readConflict(operationId);
-      if (
-        result.status !== 'success'
-        || result.value.descriptor.projectId !== projectId
-      ) {
-        new Notice(t('collab.notices.conflictUnavailable'));
-        return;
-      }
-      await this.getCollabDetailViewCoordinator().open({
-        kind: 'conflict',
-        location,
-        operationId,
-        projectId,
-        ...(location === 'request' && requestId ? { requestId } : {}),
-      });
-    } catch {
-      new Notice(t('collab.notices.conflictUnavailable'));
-    }
-  }
-
-  private async openCollabRequest(projectId: string, requestId: string): Promise<void> {
-    try {
-      const feature = await this.requireCollabFeatureService();
-      const [reviewResult, snapshotResult] = await Promise.all([
-        feature.prepareReview(projectId, requestId),
-        feature.readSnapshot(projectId),
-      ]);
-      if (reviewResult.status !== 'success' || snapshotResult.status !== 'success') {
-        new Notice(t('collab.notices.reviewUnavailable'));
-        return;
-      }
-      const review = reviewResult.value;
-      await this.openPreparedCollabReview(
-        projectId,
-        review,
-        snapshotResult.value,
-        review.files[0]?.path,
-      );
-    } catch {
-      new Notice(t('collab.notices.reviewUnavailable'));
-    }
-  }
-
-  private async openPreparedCollabReview(
-    projectId: string,
-    review: CollabRequestReview,
-    coordination: CollabCoordinationSnapshot,
-    selectedPath?: string,
-  ): Promise<void> {
-    if (review.projectId !== projectId) {
-      new Notice(t('collab.notices.reviewUnavailable'));
-      return;
-    }
-    try {
-      const state = {
-        comparisonBaseOid: review.comparisonBaseOid,
-        comparisonTargetOid: review.comparisonTargetOid,
-        kind: 'request' as const,
-        projectId,
-        requestId: review.detail.request.id,
-        reviewedHeadOid: review.detail.reviewedHeadOid,
-        reviewedMainOid: review.detail.currentMainOid,
-        ...(selectedPath ? { selectedPath } : {}),
-      };
-      await this.getCollabDetailViewCoordinator().open(
-        state,
-        { coordination, review },
-      );
-    } catch {
-      new Notice(t('collab.notices.reviewUnavailable'));
-    }
-  }
-
-  private async openPreparedCollabPublicationReview(
-    projectId: string,
-    review: CollabPublicationReview,
-    selectedPath?: string,
-  ): Promise<void> {
-    if (review.projectId !== projectId) {
-      new Notice(t('collab.notices.reviewUnavailable'));
-      return;
-    }
-    try {
-      const selected = review.files.find(file => file.path === selectedPath) ?? review.files[0];
-      this.collabPreparedReviews.storePublication(review);
-      await this.getCollabDetailViewCoordinator().open({
-        candidateOid: review.candidateOid,
-        comparisonBaseOid: review.comparisonBaseOid,
-        comparisonTargetOid: review.comparisonTargetOid,
-        currentMainOid: review.currentMainOid,
-        kind: 'publication',
-        operationId: review.operationId,
-        projectId,
-        ...(selected ? { selectedPath: selected.path } : {}),
-      });
-    } catch {
-      new Notice(t('collab.notices.reviewUnavailable'));
-    }
-  }
-
-  private async requireCollabFeatureService(): Promise<CollabFeatureService> {
-    const feature = await this.getCollabFeatureService();
-    if (!feature) throw new Error(t('collab.notices.desktopRequired'));
-    return feature;
-  }
-
-  private getCollabDetailViewCoordinator(): CollabDetailViewCoordinator {
-    this.collabDetailViewCoordinator ??= new CollabDetailViewCoordinator(
-      this.app.workspace,
-      this.collabPreparedReviews,
-    );
-    return this.collabDetailViewCoordinator;
   }
 
   private getLeafForPlacement(placement: ChatViewPlacement): WorkspaceLeaf | null {
@@ -1182,7 +418,6 @@ export default class ClaudianPlugin extends Plugin {
   }
 
   async loadSettings(options: { deferNonRestoredSessionMetadata?: boolean } = {}) {
-    this.hasLoadedAllSessionMetadata = false;
     const sharedStorage = new SharedStorageService(this);
     this.storage = sharedStorage;
     this.tabWorkspaceMigrationCoordinator = new TabWorkspaceMigrationCoordinator(
@@ -1191,9 +426,9 @@ export default class ClaudianPlugin extends Plugin {
       isClaudianView,
     );
     try {
-      await deleteLegacyMcpConfig(sharedStorage.getAdapter());
+      await deleteLegacyMCPConfig(sharedStorage.getAdapter());
     } catch {
-      new Notice('Failed to remove obsolete Claude configuration');
+      new Notice('Failed to remove obsolete Claude Code configuration');
     }
     const { claudian } = await sharedStorage.initialize();
     this.settings = {
@@ -1213,6 +448,7 @@ export default class ClaudianPlugin extends Plugin {
         ProviderSettingsCoordinator.persistProjectedProviderState(settings);
         await this.storage.saveClaudianSettings(settings);
       },
+      (settings, previous) => this.publishCommittedSettings(settings, previous),
     );
     this.chatModelSelectionCoordinator = new ChatModelSelectionCoordinator(
       this.settingsCoordinator,
@@ -1220,13 +456,33 @@ export default class ClaudianPlugin extends Plugin {
     this.pinnedLinkedContentPaths = new PinnedLinkedContentPathCoordinator(
       this.settingsCoordinator,
     );
-    const didNormalizePendingSessionInvalidations = this.syncPendingSessionInvalidations();
     this.conversationRepository = new ConversationRepository({
       getSettings: () => this.settings,
       getVaultPath: () => getVaultPath(this.app),
       persistence: sharedStorage.conversationPersistence,
       onConversationDeleted: (conversationId) => this.resetDeletedConversationTabs(conversationId),
     });
+    this.runtimeSettings = new RuntimeSettingsCoordinator({
+      settings: this.settingsCoordinator,
+      conversations: this.conversationRepository,
+      getSettings: () => this.settings,
+      canCompleteInvalidations: () => this.sessionMetadata.hasLoadedAll && !this.isUnloading,
+    });
+    this.sessionMetadata = new SessionMetadataLoader({
+      sessions: sharedStorage.sessions,
+      conversations: this.conversationRepository,
+      runtimeSettings: this.runtimeSettings,
+      isUnloading: () => this.isUnloading,
+      whenLayoutReady: (callback) => {
+        if (typeof this.app.workspace.onLayoutReady === 'function') {
+          this.app.workspace.onLayoutReady(callback);
+        } else {
+          callback();
+        }
+      },
+      onConversationListChanged: () => this.notifyConversationViewsChanged(),
+    });
+    const didNormalizePendingSessionInvalidations = this.runtimeSettings.syncPendingSessionInvalidations();
 
     const didNormalizeProviderSelection = ProviderSettingsCoordinator.normalizeProviderSelection(
       this.settings,
@@ -1242,13 +498,13 @@ export default class ClaudianPlugin extends Plugin {
         }
       : await StartupProfiler.runAsync(
           'session-metadata-load',
-          () => this.loadSessionMetadataWithSources(),
+          () => this.sessionMetadata.readInitialMetadata(),
         );
     const initialModelRecoverySources = initialMetadataScan.records.map(({ metadata }) => (
-      this.createConversationMetadataShell(metadata)
+      this.sessionMetadata.createShell(metadata)
     ));
     const initialEntries = initialMetadataScan.records.map(({ metadata, needsMigration, source }) => ({
-      conversation: this.createConversationMetadataShell(metadata),
+      conversation: this.sessionMetadata.createShell(metadata),
       needsMigration,
       source,
     }));
@@ -1272,18 +528,16 @@ export default class ClaudianPlugin extends Plugin {
     }
     setLocale(this.settings.locale as Locale);
 
-    const reconciliation = this.reconcileModelWithEnvironment();
-    this.markPendingSessionInvalidations(
+    const reconciliation = this.runtimeSettings.reconcile();
+    this.runtimeSettings.markPendingSessionInvalidations(
       this.settings,
       reconciliation.sessionInvalidationProviderIds,
     );
-    const pendingInvalidatedConversations = ProviderSettingsCoordinator
-      .invalidateConversationSessions(
-        this.conversationRepository.getAll(),
-        Array.from(this.pendingEnvironmentInvalidationGenerations.keys()),
-      );
+    const pendingInvalidatedConversations = this.conversationRepository.invalidateProviderSessions(
+      this.runtimeSettings.getPendingProviderIds(),
+    );
     const completedInvalidationGenerations = initialMetadataScan.complete
-      ? new Map(this.pendingEnvironmentInvalidationGenerations)
+      ? new Map(this.runtimeSettings.getPendingGenerations())
       : new Map<ProviderId, number>();
 
     ProviderSettingsCoordinator.projectActiveProviderState(
@@ -1307,481 +561,8 @@ export default class ClaudianPlugin extends Plugin {
     await this.conversationRepository.persistConversations(
       Array.from(conversationsToSave),
     );
-    await this.completePendingSessionInvalidations(completedInvalidationGenerations);
-    this.hasLoadedAllSessionMetadata = initialMetadataScan.complete;
-    this.pendingSessionMetadataScan = deferRemainingMetadata;
-  }
-
-  private async loadSessionMetadataWithSources(): Promise<{
-    records: SessionMetadataReadResult[];
-    complete: boolean;
-    invalidMetadataCount: number;
-  }> {
-    const scan = await this.storage.sessions.scanMetadata();
-    return {
-      records: await this.resolveMetadataSources(scan.metadata),
-      complete: scan.complete,
-      invalidMetadataCount: scan.invalidMetadataCount,
-    };
-  }
-
-  private async resolveMetadataSources(
-    metadata: SessionMetadata[],
-  ): Promise<SessionMetadataReadResult[]> {
-    const records = await Promise.all(
-      metadata.map(({ id }) => this.storage.sessions.load(id)),
-    );
-    return records.filter(
-      (record): record is SessionMetadataReadResult => record !== null,
-    );
-  }
-
-  private async applyCollabEnabled(enabled: boolean): Promise<void> {
-    if (this.isUnloading) return;
-    this.collabLifecycleGeneration += 1;
-    if (!enabled) this.collabTransientSurfaces.closeAll();
-    if (this.settings.collabEnabled !== enabled) {
-      await this.mutateSettings(settings => {
-        settings.collabEnabled = enabled;
-      });
-    }
-    this.collabComposerReferences.refreshAvailability();
-    for (const view of this.getAllViews()) view.refreshCollabAvailability();
-    if (enabled) {
-      void this.startAgentRuntime();
-      this.scheduleCollabHostRestore();
-      return;
-    }
-    this.app.workspace.detachLeavesOfType(COLLAB_DETAIL_VIEW_TYPE);
-    await this.closeCollabOwners();
-  }
-
-  private async closeCollabOwners(): Promise<void> {
-    if (this.collabHostRestoreTimer !== null) {
-      window.clearTimeout(this.collabHostRestoreTimer);
-      this.collabHostRestoreTimer = null;
-    }
-    const feature = this.collabFeatureService;
-    const featureConstruction = this.collabFeatureServicePromise;
-    const hostRestore = this.collabHostRestore;
-    const featureClose = feature?.close();
-    const runtimeStart = this.agentRuntimeStartPromise;
-    await runtimeStart?.catch(() => null);
-    const runtime = this.agentRuntime;
-    await runtime?.close().catch(() => undefined);
-    await runtime?.waitForWriteInvocations().catch(() => undefined);
-    await hostRestore?.catch(() => undefined);
-    const constructed = await featureConstruction?.catch(() => null);
-    await constructed?.close().catch(() => undefined);
-    await featureClose?.catch(() => undefined);
-    await this.collabDetailViewCoordinator?.close().catch(() => undefined);
-    this.collabDetailViewCoordinator = null;
-    this.collabPreparedReviews.clear();
-    await this.collabFoundation?.close().catch(() => undefined);
-    this.agentRuntime = null;
-    this.agentRuntimeStartPromise = null;
-    this.collabFeatureService = null;
-    this.collabFeatureServicePromise = null;
-    this.collabFoundation = null;
-    this.collabHostRestore = null;
-    this.collabHostRestoreRetryDelayMs = 1_000;
-  }
-
-  private initializeCollabLayoutLifecycle(): void {
-    const afterLayoutReady = (): void => {
-      if (this.isUnloading) return;
-      this.collabLayoutReady = true;
-      this.app.workspace.detachLeavesOfType(COLLAB_DETAIL_VIEW_TYPE);
-      if (this.isCollabEnabled()) this.scheduleCollabHostRestore();
-    };
-
-    if (typeof this.app.workspace.onLayoutReady === 'function') {
-      this.app.workspace.onLayoutReady(afterLayoutReady);
-    } else {
-      afterLayoutReady();
-    }
-  }
-
-  private scheduleCollabHostRestore(delayMs = 0): void {
-    if (
-      !this.collabLayoutReady
-      || !this.isCollabEnabled()
-      || this.collabHostRestore
-      || this.collabHostRestoreTimer !== null
-    ) return;
-    this.collabHostRestoreTimer = window.setTimeout(() => {
-      this.collabHostRestoreTimer = null;
-      this.startCollabHostRestore();
-    }, delayMs);
-  }
-
-  private startCollabHostRestore(): void {
-    if (!this.isCollabEnabled() || this.collabHostRestore) return;
-    let retry = false;
-    const restore = (async () => {
-      const feature = await this.getCollabFeatureService();
-      if (!feature || !this.isCollabEnabled()) return;
-      await feature.restoreLifecycle().catch(() => {
-        retry = true;
-      });
-      if (!this.isCollabEnabled()) return;
-      await feature.restoreHosts().catch(() => {
-        retry = true;
-      });
-    })().catch(() => {
-      retry = true;
-    }).finally(() => {
-      if (this.collabHostRestore === restore) this.collabHostRestore = null;
-      if (retry && this.isCollabEnabled() && !this.isUnloading) {
-        const delay = this.collabHostRestoreRetryDelayMs;
-        this.collabHostRestoreRetryDelayMs = Math.min(delay * 2, 30_000);
-        this.scheduleCollabHostRestore(delay);
-      } else if (!retry) {
-        this.collabHostRestoreRetryDelayMs = 1_000;
-      }
-    });
-    this.collabHostRestore = restore;
-  }
-
-  private scheduleRemainingSessionMetadataLoad(): void {
-    if (!this.pendingSessionMetadataScan || this.isUnloading) {
-      return;
-    }
-
-    const schedule = (): void => {
-      if (!this.pendingSessionMetadataScan || this.isUnloading) {
-        return;
-      }
-      this.sessionMetadataLoadTimer = window.setTimeout(() => {
-        this.sessionMetadataLoadTimer = null;
-        this.startRemainingSessionMetadataLoad();
-      }, 0);
-    };
-
-    if (typeof this.app.workspace.onLayoutReady === 'function') {
-      this.app.workspace.onLayoutReady(schedule);
-    } else {
-      schedule();
-    }
-  }
-
-  private startRemainingSessionMetadataLoad(): void {
-    if (
-      !this.pendingSessionMetadataScan
-      || this.isUnloading
-      || this.remainingSessionMetadataLoad
-    ) {
-      return;
-    }
-
-    this.pendingSessionMetadataScan = false;
-    const load = StartupProfiler.runAsync(
-      'session-metadata-background-load',
-      () => this.loadRemainingSessionMetadata(),
-    ).catch(() => {
-      StartupProfiler.increment('session-metadata-background-failures');
-    }).finally(() => {
-      if (this.remainingSessionMetadataLoad === load) {
-        this.remainingSessionMetadataLoad = null;
-      }
-    });
-    this.remainingSessionMetadataLoad = load;
-  }
-
-  private async loadRemainingSessionMetadata(): Promise<void> {
-    this.isLoadingRemainingSessionMetadata = true;
-    try {
-      const addedConversations: Conversation[] = [];
-      const invalidatedConversations: Conversation[] = [];
-      let didChangeConversationList = false;
-      const publishBatch = (records: SessionMetadataReadResult[]): void => {
-        if (this.isUnloading || records.length === 0) return;
-
-        const recoverySources = records.map(({ metadata }) => (
-          this.createConversationMetadataShell(metadata)
-        ));
-        const publishable = records
-          .map(record => ({
-            conversation: this.createConversationMetadataShell(record.metadata),
-            source: record.source,
-          }))
-          .filter(({ conversation }) => (
-            this.conversationRepository.isSelectedModelPublicationSafe(conversation)
-          ));
-        const shells = publishable.map(({ conversation }) => conversation);
-        const publishedIds = new Set(shells.map(({ id }) => id));
-        const invalidatedShells = ProviderSettingsCoordinator
-          .invalidateConversationSessions(
-            shells,
-            Array.from(this.pendingEnvironmentInvalidationGenerations.keys()),
-          );
-        const invalidatedIds = new Set(
-          invalidatedShells.map(({ id }) => id),
-        );
-        const added = publishable.flatMap(({ conversation, source }) => (
-          this.conversationRepository.mergeMetadataConversations(
-            [conversation],
-            source === 'legacy' ? 'unscoped' : source,
-          )
-        ));
-        this.conversationRepository.registerHistoricalModelRecoverySources(
-          recoverySources.filter(({ id }) => publishedIds.has(id)),
-        );
-        if (added.length === 0) return;
-
-        addedConversations.push(...added);
-        invalidatedConversations.push(
-          ...added.filter(({ id }) => invalidatedIds.has(id)),
-        );
-        didChangeConversationList = true;
-      };
-      const scan = await this.storage.sessions.scan({
-        onBatch: publishBatch,
-      });
-      if (this.isUnloading) {
-        return;
-      }
-
-      StartupProfiler.recordCount('session-metadata-count', scan.records.length);
-      StartupProfiler.recordCount(
-        'invalid-session-metadata-count',
-        scan.invalidMetadataCount,
-      );
-      const scannedShells = scan.records
-        .map(({ metadata }) => this.conversationRepository.getCachedConversation(metadata.id))
-        .filter((shell): shell is Conversation => shell !== null);
-      const records = await this.resolveMetadataSources(
-        scan.records.map(({ metadata }) => metadata),
-      );
-      const resolvedIds = new Set(records.map(({ metadata }) => metadata.id));
-      const unresolvedShells = scannedShells.filter(
-        ({ id }) => !resolvedIds.has(id),
-      );
-      this.conversationRepository.discardUnresolvedMetadataShells(
-        unresolvedShells,
-      );
-      if (unresolvedShells.length > 0) {
-        didChangeConversationList = true;
-      }
-      publishBatch(records);
-      const entries = records.map(({ metadata, needsMigration, source }) => ({
-        conversation: this.createConversationMetadataShell(metadata),
-        needsMigration,
-        source,
-      }));
-      const shells = entries.map(({ conversation }) => conversation);
-      const invalidatedEntries = ProviderSettingsCoordinator
-        .invalidateConversationSessions(
-          shells,
-          Array.from(this.pendingEnvironmentInvalidationGenerations.keys()),
-        );
-      const invalidatedIds = new Set(
-        invalidatedEntries.map(({ id }) => id),
-      );
-      const existingIds = new Set(
-        this.conversationRepository.getAll().map(({ id }) => id),
-      );
-      await this.conversationRepository.adoptMetadataConversations(entries);
-      this.conversationRepository.registerHistoricalModelRecoverySources(
-        shells,
-      );
-      const adoptedConversations = shells.filter((conversation) => (
-        !existingIds.has(conversation.id)
-        && this.conversationRepository.getCachedConversation(conversation.id)
-          === conversation
-      ));
-      if (adoptedConversations.length > 0) {
-        addedConversations.push(...adoptedConversations);
-        invalidatedConversations.push(
-          ...adoptedConversations.filter(({ id }) => invalidatedIds.has(id)),
-        );
-        didChangeConversationList = true;
-      }
-      const currentAddedConversations = addedConversations.filter((conversation) => (
-        this.conversationRepository.getCachedConversation(conversation.id)
-          === conversation
-      ));
-      const currentInvalidatedConversations = invalidatedConversations.filter(
-        (conversation) => (
-          this.conversationRepository.getCachedConversation(conversation.id)
-            === conversation
-        ),
-      );
-      const uniqueCurrentInvalidatedConversations = currentInvalidatedConversations.filter(
-        ({ id }, index, conversations) => (
-          conversations.findIndex(conversation => conversation.id === id) === index
-        ),
-      );
-      StartupProfiler.recordCount('background-session-metadata-count', currentAddedConversations.length);
-      let recoveredModels: Conversation[] = [];
-      if (!this.isUnloading) {
-        recoveredModels = await this.conversationRepository
-          .recoverMissingSelectedModels();
-        StartupProfiler.recordCount(
-          'recovered-session-model-count',
-          recoveredModels.length,
-        );
-      }
-      await this.conversationRepository.persistConversations(
-        uniqueCurrentInvalidatedConversations,
-      );
-      if (
-        !this.isUnloading
-        && (didChangeConversationList || recoveredModels.length > 0)
-      ) {
-        this.notifyConversationViewsChanged();
-      }
-      if (scan.complete) {
-        this.hasLoadedAllSessionMetadata = true;
-        if (!this.isUnloading) {
-          await this.completePendingSessionInvalidations(
-            this.getCompletablePendingSessionInvalidations(),
-          );
-        }
-      }
-    } finally {
-      this.isLoadingRemainingSessionMetadata = false;
-    }
-  }
-
-  private syncPendingSessionInvalidations(): boolean {
-    const pending = readPendingProviderSessionInvalidations(this.settings);
-    const changed = !hasSamePendingProviderSessionInvalidations(
-      this.settings.pendingProviderSessionInvalidations,
-      pending,
-    );
-    this.settings.pendingProviderSessionInvalidations =
-      serializePendingProviderSessionInvalidations(pending);
-    this.pendingEnvironmentInvalidationGenerations = pending;
-    return changed;
-  }
-
-  private markPendingSessionInvalidations(
-    settings: ClaudianSettings,
-    providerIds: ProviderId[],
-  ): Map<ProviderId, number> {
-    const marked = this.stagePendingSessionInvalidations(settings, providerIds);
-    this.commitPendingSessionInvalidations(marked);
-    return marked;
-  }
-
-  private stagePendingSessionInvalidations(
-    settings: ClaudianSettings,
-    providerIds: ProviderId[],
-  ): Map<ProviderId, number> {
-    const pending = readPendingProviderSessionInvalidations(settings);
-    const marked = new Map<ProviderId, number>();
-    for (const providerId of new Set(providerIds)) {
-      const previousGeneration = Math.max(
-        pending.get(providerId) ?? 0,
-        this.pendingEnvironmentInvalidationGenerations.get(providerId) ?? 0,
-      );
-      const generation = Math.max(Date.now(), previousGeneration + 1);
-      pending.set(providerId, generation);
-      marked.set(providerId, generation);
-    }
-    settings.pendingProviderSessionInvalidations =
-      serializePendingProviderSessionInvalidations(pending);
-    return marked;
-  }
-
-  private commitPendingSessionInvalidations(
-    generations: ReadonlyMap<ProviderId, number>,
-  ): void {
-    for (const [providerId, generation] of generations) {
-      this.pendingEnvironmentInvalidationGenerations.set(providerId, generation);
-    }
-  }
-
-  private blockEnvironmentInvalidationCompletion(
-    generations: ReadonlyMap<ProviderId, number>,
-  ): void {
-    for (const [providerId, generation] of generations) {
-      this.blockedEnvironmentInvalidationGenerations.set(providerId, generation);
-    }
-  }
-
-  private releaseEnvironmentInvalidationCompletion(
-    generations: ReadonlyMap<ProviderId, number>,
-  ): void {
-    for (const [providerId, generation] of generations) {
-      if (this.blockedEnvironmentInvalidationGenerations.get(providerId) === generation) {
-        this.blockedEnvironmentInvalidationGenerations.delete(providerId);
-      }
-    }
-  }
-
-  private getCompletablePendingSessionInvalidations(): Map<ProviderId, number> {
-    return new Map(Array.from(
-      this.pendingEnvironmentInvalidationGenerations,
-      ([providerId, generation]) => [providerId, generation] as const,
-    ).filter(([providerId, generation]) => (
-      this.blockedEnvironmentInvalidationGenerations.get(providerId) !== generation
-    )));
-  }
-
-  private async completePendingSessionInvalidations(
-    completedGenerations: ReadonlyMap<ProviderId, number>,
-  ): Promise<void> {
-    if (completedGenerations.size === 0) {
-      return;
-    }
-
-    const removed = new Map<ProviderId, number>();
-    try {
-      await this.mutateSettingsConditionally((settings) => {
-        const pending = readPendingProviderSessionInvalidations(settings);
-        for (const [providerId, generation] of completedGenerations) {
-          if (pending.get(providerId) === generation) {
-            pending.delete(providerId);
-            removed.set(providerId, generation);
-          }
-        }
-        if (removed.size === 0) {
-          return false;
-        }
-        settings.pendingProviderSessionInvalidations =
-          serializePendingProviderSessionInvalidations(pending);
-        return true;
-      });
-    } catch (error) {
-      const pending = readPendingProviderSessionInvalidations(this.settings);
-      for (const [providerId, generation] of removed) {
-        if (this.pendingEnvironmentInvalidationGenerations.get(providerId) === generation) {
-          pending.set(providerId, generation);
-        }
-      }
-      this.settings.pendingProviderSessionInvalidations =
-        serializePendingProviderSessionInvalidations(pending);
-      throw error;
-    }
-
-    for (const [providerId, generation] of removed) {
-      if (this.pendingEnvironmentInvalidationGenerations.get(providerId) === generation) {
-        this.pendingEnvironmentInvalidationGenerations.delete(providerId);
-      }
-    }
-  }
-
-  private createConversationMetadataShell(meta: SessionMetadata): Conversation {
-    return {
-      id: meta.id,
-      providerId: meta.providerId ?? DEFAULT_CHAT_PROVIDER_ID,
-      title: meta.title,
-      createdAt: meta.createdAt,
-      lastActivityAt: meta.lastActivityAt,
-      sessionId: meta.sessionId !== undefined ? meta.sessionId : meta.id,
-      selectedModel: meta.selectedModel,
-      providerState: meta.providerState,
-      modelRecoverySource: meta.modelRecoverySource,
-      messages: [],
-      linkedContentPath: meta.linkedContentPath,
-      isPinned: meta.isPinned,
-      isArchived: meta.isArchived,
-      usage: meta.usage,
-      titleGenerationStatus: meta.titleGenerationStatus,
-      resumeAtMessageId: meta.resumeAtMessageId,
-    };
+    await this.runtimeSettings.completePendingSessionInvalidations(completedInvalidationGenerations);
+    this.sessionMetadata.finishStartup(initialMetadataScan.complete, deferRemainingMetadata);
   }
 
   normalizeModelVariantSettings(): boolean {
@@ -1794,6 +575,52 @@ export default class ClaudianPlugin extends Plugin {
     await this.settingsCoordinator.persistCurrent();
   }
 
+  getActiveModelSelection(): { providerId: ProviderId; model: string } | null {
+    const tab = this.getView()?.getActiveTab();
+    if (!tab) return null;
+    const conversation = tab.conversationId ? this.getConversationSummary(tab.conversationId) : null;
+    const providerId = conversation?.providerId ?? tab.providerId;
+    if (!providerId) return null;
+    const model = conversation
+      ? resolveConversationModel(this.getCommittedSettings(), providerId, conversation).model
+      : tab.draftModel;
+    return model ? { providerId, model } : null;
+  }
+
+  private async publishCommittedSettings(settings: Readonly<ClaudianSettings>, previous: Readonly<ClaudianSettings>): Promise<void> {
+    const errors: unknown[] = [];
+    const publish = (refresh: () => void): void => {
+      try { refresh(); } catch (error) { errors.push(error); }
+    };
+    const timestampsChanged = settings.showMessageTimestamps !== previous.showMessageTimestamps;
+    const layoutChanged = settings.enableDualPane !== previous.enableDualPane || settings.dualPaneSide !== previous.dualPaneSide;
+    const commandsChanged = JSON.stringify(settings.hiddenCommands) !== JSON.stringify(previous.hiddenCommands);
+    const contextChanged = JSON.stringify(settings.customContextLimits) !== JSON.stringify(previous.customContextLimits);
+    if (timestampsChanged || layoutChanged || commandsChanged || contextChanged) {
+      for (const view of this.getAllViews()) {
+        if (timestampsChanged) publish(() => view.refreshMessageTimestamps());
+        if (layoutChanged) publish(() => view.refreshDualPaneLayout());
+        if (commandsChanged) publish(() => view.updateHiddenCommands());
+        if (contextChanged) publish(() => view.refreshModelSelector());
+      }
+    }
+    if (settings.enableZenMode !== previous.enableZenMode) publish(() => this.zenMode.reconcile());
+    if (settings.maxWarmAgentProcesses !== previous.maxWarmAgentProcesses) {
+      try {
+        if (!await this.warmExecutionPool.reconcileLimit()) {
+          new Notice('The new concurrent running session limit will apply as busy sessions become idle.');
+        }
+      } catch (error) {
+        new Notice(error instanceof Error ? error.message : 'Failed to release excess warm agent processes.');
+      }
+    }
+    if (errors.length > 0) throw new AggregateError(errors, 'Settings view publication failed.');
+  }
+
+  getCommittedSettings(): Readonly<ClaudianSettings> {
+    return this.settingsCoordinator.getCommittedSettings();
+  }
+
   async mutateSettings(
     mutation: SettingsMutation<ClaudianSettings>,
     onCommitted?: SettingsCommit<ClaudianSettings>,
@@ -1801,67 +628,21 @@ export default class ClaudianPlugin extends Plugin {
     await this.settingsCoordinator.mutate(mutation, onCommitted);
   }
 
-  isCollabEnabled(): boolean {
-    return !this.isUnloading && this.settings?.collabEnabled === true;
-  }
-
-  async checkCollabGitInstallation(
-    rescan = false,
-  ): Promise<'available' | 'unavailable'> {
-    if (!this.collabSettingsGitResolver) {
-      const { GitRuntimeResolver } = await import(
-        './app/collab/git/GitRuntimeResolver'
-      );
-      this.collabSettingsGitResolver = new GitRuntimeResolver();
-    }
-    const input = {
-      configuredPath: this.settings.collabGitPath ?? '',
-      pathEnvironment: process.env.PATH,
-    };
-    const resolution = rescan
-      ? await this.collabSettingsGitResolver.rescan(input)
-      : await this.collabSettingsGitResolver.resolve(input);
-    return resolution.status === 'available' ? 'available' : 'unavailable';
-  }
-
-  setCollabEnabled(enabled: boolean): Promise<void> {
-    const transition = this.collabLifecycleTail.then(
-      () => this.applyCollabEnabled(enabled),
-      () => this.applyCollabEnabled(enabled),
-    );
-    this.collabLifecycleTail = transition.catch(() => undefined);
-    return transition;
-  }
-
-  async setCollabProjectsFolder(raw: string): Promise<
-    { readonly ok: true; readonly value: string }
-    | { readonly message: string; readonly ok: false }
-  > {
-    const parsed = parseCollabProjectsFolder(raw, {
-      obsidianConfigDirectory: this.app.vault.configDir,
-    });
-    if (!parsed.ok) return { message: parsed.message, ok: false };
-    if (this.settings.collabProjectsFolder !== parsed.value) {
-      await this.mutateSettings(settings => {
-        settings.collabProjectsFolder = parsed.value;
-      });
-    }
-    return { ok: true, value: parsed.value };
-  }
-
   getAgentSkillResourceGeneration(): number {
     return this.agentSkillResourceGeneration;
   }
 
   async notifyAgentSkillsChanged(): Promise<void> {
-    const providerIds: ProviderId[] = ['codex', 'grok', 'pi', 'opencode'];
+    const providerIds = ProviderWorkspaceRegistry.getAgentSkillProviderIds();
     const generation = ++this.agentSkillResourceGeneration;
 
     for (const view of this.getAllViews()) {
       view.invalidateProviderResources(providerIds, generation);
     }
 
-    await ProviderWorkspaceRegistry.getIfInitialized('codex')?.commandCatalog?.refresh();
+    await Promise.all(providerIds.map(async providerId => {
+      await ProviderWorkspaceRegistry.getIfInitialized(providerId)?.onAgentSkillsChanged?.();
+    }));
   }
 
   async mutateSettingsConditionally(
@@ -1893,7 +674,7 @@ export default class ClaudianPlugin extends Plugin {
   ): Promise<void> {
     const uniqueProviderIds = Array.from(new Set(providerIds));
     await this.runProviderExecutionTransition(uniqueProviderIds, async () => {
-      await this.commitProviderRuntimeSettings(
+      await this.runtimeSettings.commit(
         uniqueProviderIds,
         mutation,
         {
@@ -1902,112 +683,6 @@ export default class ClaudianPlugin extends Plugin {
         },
       );
     });
-  }
-
-  private async commitProviderRuntimeSettings(
-    providerIds: ProviderId[],
-    mutation: SettingsMutation<ClaudianSettings>,
-    options: {
-      failureMessage: string;
-      onInvalidationsPersisted?: (
-        reconciliation: SettingsReconciliationResult,
-      ) => void | Promise<void>;
-      onSettingsCommitted?: (
-        reconciliation: SettingsReconciliationResult,
-      ) => void | Promise<void>;
-    },
-  ): Promise<SettingsReconciliationResult> {
-    let reconciliation: SettingsReconciliationResult = {
-      changed: false,
-      environmentChangedProviderIds: [],
-      invalidatedConversations: [],
-      sessionInvalidationProviderIds: [],
-    };
-    let invalidationGenerations = new Map<ProviderId, number>();
-    let invalidationPublished = false;
-    let settingsCommitted = false;
-    const errors: unknown[] = [];
-
-    try {
-      await this.mutateSettings(async (settings) => {
-        await mutation(settings);
-        reconciliation = this.reconcileModelWithEnvironment(providerIds, false);
-        invalidationGenerations = this.stagePendingSessionInvalidations(
-          settings,
-          reconciliation.sessionInvalidationProviderIds,
-        );
-      }, () => {
-        this.commitPendingSessionInvalidations(invalidationGenerations);
-        this.blockEnvironmentInvalidationCompletion(invalidationGenerations);
-        ProviderSettingsCoordinator.invalidateConversationSessions(
-          this.conversationRepository.getAll(),
-          reconciliation.sessionInvalidationProviderIds,
-        );
-        invalidationPublished = true;
-      });
-      settingsCommitted = true;
-    } catch (error) {
-      if (error instanceof SettingsPostCommitError) {
-        settingsCommitted = true;
-        errors.push(error.cause);
-      } else {
-        errors.push(error);
-      }
-    }
-
-    if (settingsCommitted) {
-      try {
-        await options.onSettingsCommitted?.(reconciliation);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-
-    if (invalidationPublished && invalidationGenerations.size > 0) {
-      let invalidationMetadataPersisted = false;
-      try {
-        const invalidatedProviderIds = new Set(invalidationGenerations.keys());
-        const conversationsToPersist = this.conversationRepository.getAll().filter(
-          conversation => invalidatedProviderIds.has(conversation.providerId),
-        );
-        await this.conversationRepository.persistConversations(
-          conversationsToPersist.filter(
-            (conversation) =>
-              this.conversationRepository.getCachedConversation(conversation.id)
-              === conversation,
-          ),
-        );
-        invalidationMetadataPersisted = true;
-      } catch (error) {
-        errors.push(error);
-      }
-      if (invalidationMetadataPersisted) {
-        this.releaseEnvironmentInvalidationCompletion(invalidationGenerations);
-        if (this.hasLoadedAllSessionMetadata && !this.isUnloading) {
-          try {
-            await this.completePendingSessionInvalidations(invalidationGenerations);
-          } catch (error) {
-            errors.push(error);
-          }
-        }
-      }
-    }
-
-    if (settingsCommitted) {
-      try {
-        await options.onInvalidationsPersisted?.(reconciliation);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-
-    if (errors.length === 1) {
-      throw errors[0];
-    }
-    if (errors.length > 1) {
-      throw new AggregateError(errors, options.failureMessage);
-    }
-    return reconciliation;
   }
 
   private async applyEnvironmentVariablesBatchNow(
@@ -2029,8 +704,7 @@ export default class ClaudianPlugin extends Plugin {
     const providersToQuiesce = this.getAffectedEnvironmentProviders(changedScopes);
     await this.runProviderExecutionTransition(providersToQuiesce, async () => {
       let affectedProviderIds: ProviderId[] = [];
-      const modelCatalogDiagnostics: string[] = [];
-      await this.commitProviderRuntimeSettings(
+      await this.runtimeSettings.commit(
         providersToQuiesce,
         (settings) => {
           const settingsBag = settings as unknown as Record<string, unknown>;
@@ -2047,25 +721,6 @@ export default class ClaudianPlugin extends Plugin {
         },
         {
           failureMessage: 'Environment change recovery failed.',
-          onSettingsCommitted: async () => {
-            if (affectedProviderIds.length === 0) {
-              return;
-            }
-            for (const providerId of affectedProviderIds) {
-              if (ProviderRegistry.isEnabled(providerId, this.settings)) {
-                const transitionOwner = { providerTransitionOwner: true } as const;
-                const result = await ProviderWorkspaceRegistry.refreshModelCatalog(
-                  providerId,
-                  transitionOwner,
-                );
-                if (result.diagnostics) {
-                  modelCatalogDiagnostics.push(
-                    `${ProviderRegistry.getProviderDisplayName(providerId)}: ${result.diagnostics}`,
-                  );
-                }
-              }
-            }
-          },
           onInvalidationsPersisted: async (reconciliation) => {
             if (affectedProviderIds.length === 0) {
               return;
@@ -2083,9 +738,6 @@ export default class ClaudianPlugin extends Plugin {
               ? 'Environment variables applied. Sessions will be rebuilt on next message.'
               : 'Environment variables applied.';
             new Notice(noticeText);
-            if (modelCatalogDiagnostics.length > 0) {
-              new Notice(`Model catalog refresh failed:\n${modelCatalogDiagnostics.join('\n')}`);
-            }
           },
         },
       );
@@ -2113,7 +765,7 @@ export default class ClaudianPlugin extends Plugin {
 
   async getResolvedProviderCliPath(
     providerId: ProviderId,
-    context?: ProviderCliResolutionContext,
+    context?: ProviderCLIResolutionContext,
   ): Promise<string | null> {
     if (context?.providerTransitionOwner !== true) {
       await ProviderWorkspaceRegistry.ensureInitialized(
@@ -2133,18 +785,6 @@ export default class ClaudianPlugin extends Plugin {
     }
 
     return cliResolver.resolveFromSettings(this.settings, context);
-  }
-
-  private reconcileModelWithEnvironment(
-    providerIds: ProviderId[] = ProviderRegistry.getRegisteredProviderIds(),
-    invalidateConversations = true,
-  ): SettingsReconciliationResult {
-    return ProviderSettingsCoordinator.reconcileProviders(
-      this.settings,
-      this.conversationRepository.getAll(),
-      providerIds,
-      { invalidateConversations },
-    );
   }
 
   private getAffectedEnvironmentProviders(scopes: EnvironmentScope[]): ProviderId[] {
@@ -2212,15 +852,10 @@ export default class ClaudianPlugin extends Plugin {
       const tabManager = view.getTabManager();
       if (!tabManager) continue;
 
-      for (const tab of tabManager.getAllTabs()) {
-        if (tab.conversationId === id) {
-          try {
-            tab.controllers.inputController?.cancelStreaming();
-            await tab.controllers.conversationController?.createNew({ force: true });
-          } catch (error) {
-            errors.push(error);
-          }
-        }
+      try {
+        await tabManager.resetConversationTabs(id);
+      } catch (error) {
+        errors.push(error);
       }
     }
     if (errors.length > 0) {
@@ -2266,13 +901,16 @@ export default class ClaudianPlugin extends Plugin {
     for (const view of this.getAllViews()) {
       view.handleLinkedContentRenamed(oldPath, file.path, includeDescendants);
     }
-    await this.rewriteLinkedContentPaths(oldPath, file.path, includeDescendants);
-    await this.pinnedLinkedContentPaths.rewritePaths(
-      oldPath,
-      file.path,
-      includeDescendants,
-    );
-    this.notifyConversationViewsChanged();
+    await this.conversationRepository.rewriteLinkedContentPaths(oldPath, file.path, { includeDescendants });
+    try {
+      await this.pinnedLinkedContentPaths.rewritePaths(
+        oldPath,
+        file.path,
+        includeDescendants,
+      );
+    } finally {
+      this.scheduleVaultRefresh();
+    }
   }
 
   private async handlePinnedLinkedContentDeleted(file: TAbstractFile): Promise<void> {
@@ -2286,7 +924,7 @@ export default class ClaudianPlugin extends Plugin {
         includeDescendants,
       );
     } finally {
-      this.notifyConversationViewsChanged();
+      this.scheduleVaultRefresh();
     }
   }
 
@@ -2306,6 +944,14 @@ export default class ClaudianPlugin extends Plugin {
     this.notifyConversationViewsChanged();
   }
 
+  private scheduleVaultRefresh(): void {
+    if (this.isUnloading || this.vaultRefreshTimer !== undefined) return;
+    this.vaultRefreshTimer = window.setTimeout(() => {
+      this.vaultRefreshTimer = undefined;
+      if (!this.isUnloading) this.notifyConversationViewsChanged();
+    }, 50);
+  }
+
   private notifyConversationViewsChanged(): void {
     for (const view of this.getAllViews()) {
       try {
@@ -2320,6 +966,8 @@ export default class ClaudianPlugin extends Plugin {
     const reconcileAndRefresh = async (): Promise<void> => {
       let didReconcile = false;
       try {
+        await this.mutateSettingsConditionally(settings => ProviderSettingsCoordinator.reconcileTitleGenerationModelSelection(settings));
+        this.settingsTab?.refreshModelOptions();
         const changedConversations = this.conversationRepository
           ? await this.conversationRepository.reconcileSelectedModels(providerId)
           : [];
@@ -2356,12 +1004,12 @@ export default class ClaudianPlugin extends Plugin {
     return this.conversationRepository.getCachedConversation(id);
   }
 
-  getConversationSync(id: string): Conversation | null {
-    return this.conversationRepository.getSync(id);
+  getConversationSummary(id: string) {
+    return this.conversationRepository.getSummary(id);
   }
 
-  findEmptyConversation(): Conversation | null {
-    return this.conversationRepository.findEmpty();
+  getConversationSync(id: string): Conversation | null {
+    return this.conversationRepository.getSync(id);
   }
 
   getConversationList(): ConversationMeta[] {
@@ -2369,35 +1017,7 @@ export default class ClaudianPlugin extends Plugin {
   }
 
   async ensureConversationMetadataLoaded(conversationIds: readonly string[]): Promise<void> {
-    const missingIds = Array.from(new Set(conversationIds)).filter(
-      id => !this.conversationRepository.getCachedConversation(id),
-    );
-    if (missingIds.length === 0) return;
-
-    const records = (await Promise.all(
-      missingIds.map(id => this.storage.sessions.load(id)),
-    )).filter((record): record is SessionMetadataReadResult => record !== null);
-    if (records.length === 0) return;
-
-    const entries = records.map(({ metadata, needsMigration, source }) => ({
-      conversation: this.createConversationMetadataShell(metadata),
-      needsMigration,
-      source,
-    }));
-    const shells = entries.map(({ conversation }) => conversation);
-    const invalidatedIds = new Set(
-      ProviderSettingsCoordinator.invalidateConversationSessions(
-        shells,
-        Array.from(this.pendingEnvironmentInvalidationGenerations.keys()),
-      ).map(({ id }) => id),
-    );
-    await this.conversationRepository.adoptMetadataConversations(entries);
-    this.conversationRepository.registerHistoricalModelRecoverySources(shells);
-    await this.conversationRepository.persistConversations(
-      Array.from(invalidatedIds)
-        .map(id => this.conversationRepository.getCachedConversation(id))
-        .filter((conversation): conversation is Conversation => conversation !== null),
-    );
+    await this.sessionMetadata.ensureLoaded(conversationIds);
   }
 
   registerTabWorkspaceStateDelivery(
@@ -2418,8 +1038,16 @@ export default class ClaudianPlugin extends Plugin {
     await this.tabWorkspaceMigrationCoordinator.completeMigration();
   }
 
+  registerZenModeSource(source: ZenModeSource): () => void {
+    return this.zenMode.register(source);
+  }
+
   getView(): ClaudianView | null {
     const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDIAN);
+    const activeView = this.app.workspace.getActiveViewOfType(ItemView);
+    if (isClaudianView(activeView) && leaves.some(leaf => leaf.view === activeView)) {
+      return activeView;
+    }
     return leaves.map(leaf => leaf.view).find(isClaudianView) ?? null;
   }
 
@@ -2433,7 +1061,7 @@ export default class ClaudianPlugin extends Plugin {
       const tabManager = view.getTabManager();
       if (!tabManager) continue;
 
-      const tabs = tabManager.getAllTabs();
+      const tabs = tabManager.getTabIdentities();
       for (const tab of tabs) {
         if (tab.conversationId === conversationId) {
           return { view, tabId: tab.id };

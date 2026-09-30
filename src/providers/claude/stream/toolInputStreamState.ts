@@ -1,21 +1,27 @@
-type JsonTokenType = 'brace' | 'bracket' | 'separator' | 'delimiter' | 'string' | 'number' | 'name';
+/*
+ * The partial-JSON tokenizer and repair below are adapted from @anthropic-ai/sdk's vendored
+ * copy (src/_vendor/partial-json-parser/parser.ts, MIT) of the npm package partial-json-parser,
+ * which that SDK uses to preview streamed tool input.
+ */
 
-type JsonToken = {
-  type: JsonTokenType;
+type JSONTokenType = 'brace' | 'bracket' | 'separator' | 'delimiter' | 'string' | 'number' | 'name';
+
+type JSONToken = {
+  type: JSONTokenType;
   value: string;
 };
 
-type ToolUseSnapshot = {
+export type ToolUseFields = {
   id: string;
   name: string;
   input: Record<string, unknown>;
-  partialJson: string;
 };
 
-type ToolUseFields = {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
+type ToolUseSnapshot = ToolUseFields & {
+  partialJson: string;
+  /** Lexical position at the end of partialJson, carried across deltas. */
+  inString: boolean;
+  escaped: boolean;
 };
 
 export interface TransformStreamState {
@@ -28,12 +34,10 @@ export interface TransformStreamState {
 
 const MAIN_AGENT_STREAM = '__main__';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeToolInput(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
+export function normalizeToolInput(value: unknown): Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function getContentBlockKey(parentToolUseId: string | null, index: number): string {
@@ -44,7 +48,7 @@ function getParentPrefix(parentToolUseId: string | null): string {
   return `${parentToolUseId ?? MAIN_AGENT_STREAM}:`;
 }
 
-function findClosingTokenIndex(tokens: JsonToken[], value: string): number {
+function findClosingTokenIndex(tokens: JSONToken[], value: string): number {
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     if (tokens[index]?.value === value) {
       return index;
@@ -53,8 +57,8 @@ function findClosingTokenIndex(tokens: JsonToken[], value: string): number {
   return -1;
 }
 
-function tokenizePartialJson(input: string): JsonToken[] {
-  const tokens: JsonToken[] = [];
+function tokenizePartialJSON(input: string): JSONToken[] {
+  const tokens: JSONToken[] = [];
   let index = 0;
 
   while (index < input.length) {
@@ -172,7 +176,7 @@ function tokenizePartialJson(input: string): JsonToken[] {
   return tokens;
 }
 
-function stripIncompleteTail(tokens: JsonToken[]): JsonToken[] {
+function stripIncompleteTail(tokens: JSONToken[]): JSONToken[] {
   if (tokens.length === 0) {
     return tokens;
   }
@@ -207,9 +211,9 @@ function stripIncompleteTail(tokens: JsonToken[]): JsonToken[] {
   }
 }
 
-function closeOpenContainers(tokens: JsonToken[]): JsonToken[] {
+function closeOpenContainers(tokens: JSONToken[]): JSONToken[] {
   const completedTokens = [...tokens];
-  const closingTokens: JsonToken[] = [];
+  const closingTokens: JSONToken[] = [];
 
   for (const token of completedTokens) {
       if (token.type === 'brace') {
@@ -246,24 +250,50 @@ function closeOpenContainers(tokens: JsonToken[]): JsonToken[] {
   return completedTokens;
 }
 
-function renderJson(tokens: JsonToken[]): string {
+function renderJSON(tokens: JSONToken[]): string {
   return tokens
     .map((token) => token.type === 'string' ? `"${token.value}"` : token.value)
     .join('');
 }
 
 function parsePartialToolInput(input: string): Record<string, unknown> | null {
-  const tokens = tokenizePartialJson(input);
+  const tokens = tokenizePartialJSON(input);
   if (tokens.length === 0) {
     return {};
   }
 
   try {
-    const repairedJson = renderJson(closeOpenContainers(stripIncompleteTail(tokens)));
+    const repairedJson = renderJSON(closeOpenContainers(stripIncompleteTail(tokens)));
     return normalizeToolInput(JSON.parse(repairedJson));
   } catch {
     return null;
   }
+}
+
+/**
+ * Scans only the new delta and reports whether it can change the repaired parse. Text inside an
+ * unterminated string and whitespace between tokens are dropped by the tokenizer, so deltas made
+ * only of those leave the snapshot unchanged and need no reparse of the accumulated buffer.
+ */
+function consumeDelta(snapshot: ToolUseSnapshot, delta: string): boolean {
+  let changesParse = false;
+  for (const char of delta) {
+    if (snapshot.inString) {
+      if (snapshot.escaped) {
+        snapshot.escaped = false;
+      } else if (char === '\\') {
+        snapshot.escaped = true;
+      } else if (char === '"') {
+        snapshot.inString = false;
+        changesParse = true;
+      }
+    } else if (char === '"') {
+      snapshot.inString = true;
+    } else if (!/\s/.test(char)) {
+      changesParse = true;
+    }
+  }
+  return changesParse;
 }
 
 export function createTransformStreamState(): TransformStreamState {
@@ -273,8 +303,9 @@ export function createTransformStreamState(): TransformStreamState {
     registerToolUse(parentToolUseId, index, toolUse) {
       activeToolUses.set(getContentBlockKey(parentToolUseId, index), {
         ...toolUse,
-        input: { ...toolUse.input },
         partialJson: '',
+        inString: false,
+        escaped: false,
       });
     },
     applyInputJsonDelta(parentToolUseId, index, partialJson) {
@@ -284,21 +315,17 @@ export function createTransformStreamState(): TransformStreamState {
       }
 
       snapshot.partialJson += partialJson;
+      if (!consumeDelta(snapshot, partialJson)) {
+        return null;
+      }
       const parsedInput = parsePartialToolInput(snapshot.partialJson);
       if (parsedInput === null) {
         return null;
       }
 
-      snapshot.input = {
-        ...snapshot.input,
-        ...parsedInput,
-      };
-
-      return {
-        id: snapshot.id,
-        name: snapshot.name,
-        input: { ...snapshot.input },
-      };
+      // Replaced rather than mutated, so emitted inputs stay stable after later deltas.
+      snapshot.input = { ...snapshot.input, ...parsedInput };
+      return { id: snapshot.id, name: snapshot.name, input: snapshot.input };
     },
     clearContentBlock(parentToolUseId, index) {
       activeToolUses.delete(getContentBlockKey(parentToolUseId, index));

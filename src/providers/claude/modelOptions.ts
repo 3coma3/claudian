@@ -1,218 +1,147 @@
+import { getProviderConfig } from '../../core/providers/providerConfig';
 import { getRuntimeEnvironmentVariables } from '../../core/providers/providerEnvironment';
 import type { ProviderUIOption } from '../../core/providers/types';
-import {
-  type ClaudeModelEnvType,
-  getModelsFromEnvironment,
-} from './env/claudeModelEnv';
-import { formatCustomModelLabel } from './modelLabels';
+import { getCustomModelIds } from './env/claudeModelEnv';
 import { encodeClaudeModelSelectionId, toClaudeRuntimeModelId } from './modelSelection';
-import { isClaudeModelTier } from './modelTiers';
+import { type ClaudeModelTier, isClaudeModelTier } from './modelTiers';
 import { getClaudeProviderSettings } from './settings';
-import { DEFAULT_CLAUDE_MODELS, normalizeLegacyClaudeModelAlias } from './types/models';
+import { DEFAULT_CLAUDE_MODELS, type EffortLevel } from './types/models';
 
 export interface ClaudeModelOption extends ProviderUIOption {
-  environmentTypes?: readonly ClaudeModelEnvType[];
+  resolvedModel?: string;
+  supportedEffortLevels?: EffortLevel[];
+  reasoningMetadataResolved?: boolean;
 }
 
-function parseConfiguredCustomModelIds(value: string): string[] {
-  const modelIds: string[] = [];
-  const seen = new Set<string>();
-
-  for (const line of value.split(/\r?\n/)) {
-    const modelId = line.trim();
-    if (!modelId || seen.has(modelId)) {
-      continue;
-    }
-    seen.add(modelId);
-    modelIds.push(modelId);
-  }
-
-  return modelIds;
+export function getClaudeModelCatalog(settings: Record<string, unknown>): ClaudeModelOption[] {
+  const { discoveredModels, modelAliases } = getClaudeProviderSettings(settings);
+  return discoveredModels.filter(model => isSelectableClaudeModel(model.value)).map(model => ({
+    ...model,
+    value: isClaudeModelTier(model.value) ? model.value : encodeClaudeModelSelectionId(model.value),
+    label: modelAliases[model.value] || model.label,
+  }));
 }
 
-function normalizeCustomModelAliases(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-
-  const aliases: Record<string, string> = {};
-  for (const [rawModelId, rawAlias] of Object.entries(value)) {
-    if (typeof rawAlias !== 'string') {
-      continue;
-    }
-
-    const modelId = rawModelId.trim();
-    const alias = rawAlias.trim();
-    if (modelId && alias) {
-      aliases[modelId] = alias;
-    }
-  }
-
-  return aliases;
+/** Legacy configuration only seeds enablement; it never creates catalog entries. */
+export function getClaudeVisibleModelIds(settings: Record<string, unknown>): string[] {
+  const config = getClaudeProviderSettings(settings);
+  if (config.visibleModels !== null) return config.visibleModels.filter(isSelectableClaudeModel);
+  const environmentIds = [...getCustomModelIds(getRuntimeEnvironmentVariables(settings, 'claude'))];
+  const oldManualModels = getProviderConfig(settings, 'claude').customModels;
+  return [...new Set([
+    ...(environmentIds.length ? environmentIds : DEFAULT_CLAUDE_MODELS.map(model => model.value)),
+    ...(typeof oldManualModels === 'string' ? oldManualModels.split(/\r?\n/).map(id => id.trim()).filter(Boolean) : []),
+  ])].filter(isSelectableClaudeModel);
 }
 
-export function getClaudeModelOptions(settings: Record<string, unknown>): ClaudeModelOption[] {
-  const customModelAliases = normalizeCustomModelAliases(settings.customModelAliases);
-  const customModels = getModelsFromEnvironment(
-    getRuntimeEnvironmentVariables(settings, 'claude'),
-    customModelAliases,
-  );
-  if (customModels.length > 0) {
-    return customModels.map((model) => ({
-      ...model,
-      value: encodeClaudeModelSelectionId(model.value),
-    }));
-  }
-
-  const claudeSettings = getClaudeProviderSettings(settings);
-  const models = [...DEFAULT_CLAUDE_MODELS];
-
-  const seenModelIds = new Set(models.map(model =>
-    normalizeLegacyClaudeModelAlias(toClaudeRuntimeModelId(model.value))
-  ));
-  for (const configuredModelId of parseConfiguredCustomModelIds(claudeSettings.customModels)) {
-    const modelId = toClaudeRuntimeModelId(configuredModelId);
-    const normalizedModelId = normalizeLegacyClaudeModelAlias(modelId);
-    if (seenModelIds.has(normalizedModelId)) {
-      continue;
-    }
-
-    seenModelIds.add(normalizedModelId);
-    models.push({
-      value: encodeClaudeModelSelectionId(modelId),
-      label: customModelAliases[modelId] ?? formatCustomModelLabel(modelId),
-      description: 'Custom model',
-    });
-  }
-
-  return models;
-}
-
+/** Exact identities win; a missing family member resolves to its highest reported version. */
 export function findClaudeModelOption(
-  modelOptions: readonly ClaudeModelOption[],
-  model: string,
+  options: readonly ClaudeModelOption[], model: string,
 ): ClaudeModelOption | undefined {
   const runtimeModel = toClaudeRuntimeModelId(model);
-  const exactOption = modelOptions.find(option =>
-    option.value === model || toClaudeRuntimeModelId(option.value) === runtimeModel
-  );
-  if (exactOption) {
-    return exactOption;
-  }
-
-  const normalizedRuntimeModel = normalizeLegacyClaudeModelAlias(toClaudeRuntimeModelId(model));
-  if (isClaudeModelTier(normalizedRuntimeModel)) {
-    const tierOption = modelOptions.find(option =>
-      option.environmentTypes?.includes(normalizedRuntimeModel)
-    );
-    if (tierOption) {
-      return tierOption;
-    }
-  }
-
-  return modelOptions.find(option =>
-    normalizeLegacyClaudeModelAlias(toClaudeRuntimeModelId(option.value)) === normalizedRuntimeModel
-  );
+  const exact = options.find(option => option.value === model || toClaudeRuntimeModelId(option.value) === runtimeModel);
+  if (exact) return exact;
+  const resolved = options.filter(option => option.resolvedModel === runtimeModel);
+  if (resolved.length) return resolved.length === 1 ? resolved[0] : undefined;
+  return findClaudeFamilySuccessor(options, runtimeModel);
 }
 
-export function findClaudeModelOptionForEnvironmentType(
-  modelOptions: readonly ClaudeModelOption[],
-  environmentType: ClaudeModelEnvType,
-): ClaudeModelOption | undefined {
-  const environmentOption = modelOptions.find(option =>
-    option.environmentTypes?.includes(environmentType)
-  );
-  if (environmentOption || environmentType === 'model') {
-    return environmentOption;
-  }
-
-  return modelOptions.find(option =>
-    !option.environmentTypes
-    && normalizeLegacyClaudeModelAlias(toClaudeRuntimeModelId(option.value)) === environmentType
-  );
+export interface ClaudeVisibleModel {
+  /** Saved enabled identity. */
+  id: string;
+  /** Catalog row the identity runs as; absent while Claude Code reports nothing it resolves to. */
+  option?: ClaudeModelOption;
 }
 
-export function resolveClaudeModelEnvironmentTypePreference(
-  modelOptions: readonly ClaudeModelOption[],
-  model: string,
-  previousEnvironmentType: ClaudeModelEnvType | '' = '',
-): ClaudeModelEnvType | null {
-  const exactEnvironmentTypes = modelOptions.find(option => option.value === model)
-    ?.environmentTypes;
-  if (exactEnvironmentTypes) {
-    if (
-      previousEnvironmentType
-      && exactEnvironmentTypes.includes(previousEnvironmentType)
-    ) {
-      return previousEnvironmentType;
-    }
-    return exactEnvironmentTypes.length === 1 ? exactEnvironmentTypes[0] : null;
-  }
-
-  const runtimeModel = toClaudeRuntimeModelId(model);
-  const runtimeEnvironmentTypes = modelOptions.find(option =>
-    toClaudeRuntimeModelId(option.value) === runtimeModel
-  )?.environmentTypes;
-  if (runtimeEnvironmentTypes) {
-    if (
-      previousEnvironmentType
-      && runtimeEnvironmentTypes.includes(previousEnvironmentType)
-    ) {
-      return previousEnvironmentType;
-    }
-    return runtimeEnvironmentTypes.length === 1 ? runtimeEnvironmentTypes[0] : null;
-  }
-
-  const normalizedModel = normalizeLegacyClaudeModelAlias(runtimeModel);
-  if (isClaudeModelTier(normalizedModel)) {
-    return normalizedModel;
-  }
-
-  const environmentTypes = findClaudeModelOption(modelOptions, model)?.environmentTypes;
-  if (!environmentTypes) {
-    return null;
-  }
-
-  if (
-    previousEnvironmentType
-    && environmentTypes.includes(previousEnvironmentType)
-  ) {
-    return previousEnvironmentType;
-  }
-
-  return environmentTypes.length === 1 ? environmentTypes[0] : null;
-}
-
-export function resolveClaudeModelSelection(
+/** The single resolution of enabled identities onto catalog rows, in enabled order. */
+export function resolveClaudeVisibleModels(
   settings: Record<string, unknown>,
-  currentModel: string,
-  preferredEnvironmentType?: ClaudeModelEnvType,
-): string | null {
-  const modelOptions = getClaudeModelOptions(settings);
-  if (preferredEnvironmentType) {
-    const preferredOption = findClaudeModelOptionForEnvironmentType(
-      modelOptions,
-      preferredEnvironmentType,
-    );
-    if (preferredOption) {
-      return preferredOption.value;
-    }
-  }
+  catalog: readonly ClaudeModelOption[] = getClaudeModelCatalog(settings),
+): ClaudeVisibleModel[] {
+  return getClaudeVisibleModelIds(settings).map(id => ({ id, option: findClaudeModelOption(catalog, id) }));
+}
 
-  if (currentModel) {
-    const currentOption = findClaudeModelOption(modelOptions, currentModel);
-    if (currentOption) {
-      return currentOption.value;
-    }
-  }
+export function getClaudeModelOptions(
+  settings: Record<string, unknown>,
+  catalog: readonly ClaudeModelOption[] = getClaudeModelCatalog(settings),
+): ClaudeModelOption[] {
+  return [...new Set(resolveClaudeVisibleModels(settings, catalog).flatMap(({ option }) => option ? [option] : []))];
+}
 
-  const lastModel = getClaudeProviderSettings(settings).lastModel;
-  if (lastModel) {
-    const lastOption = findClaudeModelOption(modelOptions, lastModel);
-    if (lastOption) {
-      return lastOption.value;
-    }
-  }
+/** Whether the SDK reports the model as a value or a resolved identity, as opposed to a family successor. */
+export function hasClaudeModelIdentity(options: readonly ClaudeModelOption[], model: string): boolean {
+  const runtimeModel = toClaudeRuntimeModelId(model);
+  return options.some(option => toClaudeRuntimeModelId(option.value) === runtimeModel
+    || option.resolvedModel === runtimeModel);
+}
 
-  return modelOptions[0]?.value ?? null;
+/** Identities the catalog reports keep their meaning; anything else may only follow enabled models. */
+export function findClaudeModelSelectionOption(
+  settings: Record<string, unknown>, model: string,
+  catalog: readonly ClaudeModelOption[] = getClaudeModelCatalog(settings),
+): ClaudeModelOption | undefined {
+  return findClaudeModelOption(
+    hasClaudeModelIdentity(catalog, model) ? catalog : getClaudeModelOptions(settings, catalog), model,
+  );
+}
+
+/** The enabled option a saved selection runs as; undefined when its identity is unselected or unknown. */
+export function findEnabledClaudeModelOption(
+  settings: Record<string, unknown>, model: string,
+): ClaudeModelOption | undefined {
+  const catalog = getClaudeModelCatalog(settings);
+  const selected = findClaudeModelSelectionOption(settings, model, catalog);
+  return selected && getClaudeModelOptions(settings, catalog).some(option => option.value === selected.value)
+    ? selected
+    : undefined;
+}
+
+/** Effort levels Claude Code reported for the model; empty when unknown. */
+export function getClaudeSupportedEffortLevels(
+  settings: Record<string, unknown>,
+  model: string,
+): EffortLevel[] {
+  return findClaudeModelSelectionOption(settings, model)?.supportedEffortLevels ?? [];
+}
+
+function isSelectableClaudeModel(model: string): boolean {
+  return toClaudeRuntimeModelId(model) !== 'default';
+}
+
+interface ClaudeFamilyId {
+  tier: ClaudeModelTier;
+  /** Dashed numeric components without the trailing YYYYMMDD snapshot; empty for bare aliases. */
+  version: string;
+  oneMillion: boolean;
+}
+
+/** Reads `<tier>`, `claude-<tier>-<version>[-<snapshot>]`, and their `[1m]` variants. */
+function parseClaudeFamilyId(id: string): ClaudeFamilyId | undefined {
+  const oneMillion = id.endsWith('[1m]');
+  const base = oneMillion ? id.slice(0, -'[1m]'.length) : id;
+  if (isClaudeModelTier(base)) return { tier: base, version: '', oneMillion };
+  const match = /^claude-([a-z]+)-(\d+(?:-\d+)*)?/.exec(base);
+  if (!match || !isClaudeModelTier(match[1])) return undefined;
+  return { tier: match[1], version: (match[2] ?? '').replace(/-\d{8}$/, ''), oneMillion };
+}
+
+/** A `[1m]` request accepts only `[1m]` rows; other requests prefer standard context on version ties. */
+function findClaudeFamilySuccessor(
+  options: readonly ClaudeModelOption[], runtimeModel: string,
+): ClaudeModelOption | undefined {
+  const wanted = parseClaudeFamilyId(runtimeModel);
+  if (!wanted) return undefined;
+  let best: { option: ClaudeModelOption; version: string; oneMillion: boolean } | undefined;
+  for (const option of options) {
+    if (!isSelectableClaudeModel(option.value)) continue;
+    const ids = [option.resolvedModel, toClaudeRuntimeModelId(option.value)]
+      .flatMap(id => id === undefined ? [] : [parseClaudeFamilyId(id)])
+      .filter((id): id is ClaudeFamilyId => id?.tier === wanted.tier);
+    const oneMillion = ids.some(id => id.oneMillion);
+    if (!ids.length || (wanted.oneMillion && !oneMillion)) continue;
+    const version = ids.find(id => id.version)?.version ?? '';
+    const order = best ? version.localeCompare(best.version, 'en', { numeric: true }) : 1;
+    if (order > 0 || (order === 0 && best?.oneMillion && !oneMillion)) best = { option, version, oneMillion };
+  }
+  return best?.option;
 }

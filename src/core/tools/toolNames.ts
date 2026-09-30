@@ -1,3 +1,5 @@
+// Legacy history compatibility (2026-09-29, SDK 0.3.283): "the TaskOutput tool was removed",
+// so only transcripts recorded before the removal contain it.
 export const TOOL_AGENT_OUTPUT = 'TaskOutput' as const;
 export const TOOL_ASK_USER_QUESTION = 'AskUserQuestion' as const;
 export const TOOL_BASH = 'Bash' as const;
@@ -24,18 +26,33 @@ export const TOOL_ENTER_PLAN_MODE = 'EnterPlanMode' as const;
 export const TOOL_EXIT_PLAN_MODE = 'ExitPlanMode' as const;
 
 // Runtime-managed tools exposed through provider adapters.
+export const TOOL_EXEC = 'exec' as const;
 export const TOOL_APPLY_PATCH = 'apply_patch' as const;
 export const TOOL_WRITE_STDIN = 'write_stdin' as const;
 export const TOOL_SPAWN_AGENT = 'spawn_agent' as const;
 export const TOOL_SEND_INPUT = 'send_input' as const;
+export const TOOL_SEND_MESSAGE = 'send_message' as const;
+export const TOOL_FOLLOWUP_TASK = 'followup_task' as const;
+export const TOOL_LIST_AGENTS = 'list_agents' as const;
+export const TOOL_INTERRUPT_AGENT = 'interrupt_agent' as const;
 export const TOOL_WAIT = 'wait' as const;
 export const TOOL_WAIT_AGENT = 'wait_agent' as const;
 export const TOOL_RESUME_AGENT = 'resume_agent' as const;
 export const TOOL_CLOSE_AGENT = 'close_agent' as const;
 
+const SCRIPT_TOOLS: readonly string[] = [TOOL_EXEC, 'js', 'mcp__cua_repl__js'];
+
+export function isScriptTool(name: string): boolean {
+  return SCRIPT_TOOLS.includes(name);
+}
+
 export const AGENT_LIFECYCLE_TOOLS = [
   TOOL_SPAWN_AGENT,
   TOOL_SEND_INPUT,
+  TOOL_SEND_MESSAGE,
+  TOOL_FOLLOWUP_TASK,
+  TOOL_LIST_AGENTS,
+  TOOL_INTERRUPT_AGENT,
   TOOL_WAIT,
   TOOL_WAIT_AGENT,
   TOOL_RESUME_AGENT,
@@ -51,28 +68,6 @@ export type EditToolName = (typeof EDIT_TOOLS)[number];
 
 export const WRITE_EDIT_TOOLS = [TOOL_WRITE, TOOL_EDIT] as const;
 export type WriteEditToolName = (typeof WRITE_EDIT_TOOLS)[number];
-
-export const BASH_TOOLS = [TOOL_BASH, TOOL_BASH_OUTPUT, TOOL_KILL_SHELL] as const;
-export type BashToolName = (typeof BASH_TOOLS)[number];
-
-export const FILE_TOOLS = [
-  TOOL_READ,
-  TOOL_WRITE,
-  TOOL_EDIT,
-  TOOL_GLOB,
-  TOOL_GREP,
-  TOOL_LS,
-  TOOL_NOTEBOOK_EDIT,
-  TOOL_BASH,
-] as const;
-export type FileToolName = (typeof FILE_TOOLS)[number];
-
-export const MCP_TOOLS = [
-  TOOL_LIST_MCP_RESOURCES,
-  TOOL_READ_MCP_RESOURCE,
-  TOOL_MCP,
-] as const;
-export type McpToolName = (typeof MCP_TOOLS)[number];
 
 export const READ_ONLY_TOOLS = [
   TOOL_READ,
@@ -90,18 +85,6 @@ export function isEditTool(toolName: string): toolName is EditToolName {
 
 export function isWriteEditTool(toolName: string): toolName is WriteEditToolName {
   return (WRITE_EDIT_TOOLS as readonly string[]).includes(toolName);
-}
-
-export function isFileTool(toolName: string): toolName is FileToolName {
-  return (FILE_TOOLS as readonly string[]).includes(toolName);
-}
-
-export function isBashTool(toolName: string): toolName is BashToolName {
-  return (BASH_TOOLS as readonly string[]).includes(toolName);
-}
-
-export function isMcpTool(toolName: string): toolName is McpToolName {
-  return (MCP_TOOLS as readonly string[]).includes(toolName);
 }
 
 export function isReadOnlyTool(toolName: string): toolName is ReadOnlyToolName {

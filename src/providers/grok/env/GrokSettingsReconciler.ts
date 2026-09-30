@@ -1,22 +1,23 @@
-import { createCliPathFingerprintInputs } from '../../../core/providers/cli/CliPathFingerprintInputs';
+import { getInstallationKey } from '@/core/device/InstallationKey';
+
+import { createCLIPathFingerprintInputs } from '../../../core/providers/cli/CLIPathFingerprintInputs';
 import { getRuntimeEnvironmentText } from '../../../core/providers/providerEnvironment';
 import { createRuntimeInputFingerprint } from '../../../core/providers/settings/RuntimeInputFingerprint';
 import type { ProviderSettingsReconciler } from '../../../core/providers/types';
-import { getHostnameKey, parseEnvironmentVariables } from '../../../utils/env';
+import { parseEnvironmentVariables } from '../../../utils/env';
 import {
   decodeGrokModelId,
   encodeGrokModelId,
 } from '../models';
 import {
-  clearCurrentGrokCatalog,
   getGrokProviderSettings,
-  updateGrokProviderSettings,
+  updateGrokProviderSettings
 } from '../settings';
 
 export function computeGrokEnvironmentHash(settings: Record<string, unknown>): string {
   const providerSettings = getGrokProviderSettings(settings);
-  const cliPathInputs = createCliPathFingerprintInputs(
-    providerSettings.cliPathsByHost[getHostnameKey()],
+  const cliPathInputs = createCLIPathFingerprintInputs(
+    providerSettings.cliPathsByHost[getInstallationKey()],
     providerSettings.cliPath,
   );
   const environment = Object.entries(parseEnvironmentVariables(
@@ -44,7 +45,6 @@ export const grokSettingsReconciler: ProviderSettingsReconciler = {
       return { changed: false, invalidatedConversations: [] };
     }
 
-    clearCurrentGrokCatalog(settings);
     updateGrokProviderSettings(settings, { environmentHash });
     return { changed: true, invalidatedConversations: [] };
   },

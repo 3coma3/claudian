@@ -4,25 +4,16 @@
     "cancel": "キャンセル",
     "delete": "削除",
     "edit": "編集",
-    "preview": "プレビュー",
     "add": "追加",
-    "remove": "削除",
-    "clear": "クリア",
     "clearAll": "すべてクリア",
-    "loading": "読み込み中",
     "error": "エラー",
-    "success": "成功",
-    "warning": "警告",
     "confirm": "確認",
-    "settings": "設定",
     "advanced": "詳細",
-    "enabled": "有効",
-    "disabled": "無効",
-    "platform": "プラットフォーム",
-    "refresh": "更新",
-    "rewind": "巻き戻し"
+    "refresh": "更新"
   },
   "chat": {
+    "selectAvailableModel": "送信する前に利用可能なモデルを選択してください。",
+    "selectAvailableTitleModel": "Claudianの設定で利用可能なタイトル生成モデルを選択してください。",
     "rewind": {
       "confirmMessage": "この時点に巻き戻しますか？このメッセージ以降のファイル変更は上書きまたは削除される可能性があります。この操作は元に戻せません。",
       "confirmMessageConflicts": "この時点に巻き戻しますか？エージェント外で変更された {count} 個のファイルが上書きされます：\n{files}",
@@ -51,376 +42,68 @@
       "failed": "分岐に失敗：{error}",
       "unavailableStreaming": "ストリーミング中は分岐できません",
       "unavailableNoUuid": "分岐できません：メッセージ識別子がありません",
-      "unavailableNoResponse": "分岐できません：分岐元の応答がありません",
       "errorMessageNotFound": "メッセージが見つかりません",
       "errorNoSession": "セッション ID がありません",
       "errorNoActiveTab": "アクティブなタブがありません",
       "commandNoMessages": "フォークできません: 会話にメッセージがありません",
       "commandNoAssistantUuid": "フォークできません: 識別子付きのアシスタント応答がありません"
-    }
-  },
-  "collab": {
-    "surfaceGroupLabel": "サイドバービュー",
-    "sessionsSurfaceLabel": "セッション",
-    "commands": {
-      "open": "Collab を開く",
-      "createProject": "Collab プロジェクトを作成",
-      "joinProject": "Collab プロジェクトに参加",
-      "resumeSetup": "Collab プロジェクトの設定を再開"
     },
-    "notices": {
-      "desktopRequired": "Collab にはデスクトップ上のローカル vault が必要です。",
-      "createRequiresGit": "Collab プロジェクトを作成する前に Native Git の設定が必要です。",
-      "joinRequiresGit": "Collab プロジェクトに参加する前に Native Git の設定が必要です。",
-      "initializationFailed": "Collab を初期化できませんでした。Collab を開いて復旧オプションを確認してください。",
-      "setupReady": "Collab プロジェクト「{name}」の準備ができました。",
-      "setupNeedsAttention": "Collab プロジェクトの設定には引き続き対応が必要です。",
-      "noInterruptedSetup": "中断された Collab プロジェクトの設定は見つかりませんでした。",
-      "projectFilesAvailable": "プロジェクトファイルは {path} にあります。",
-      "conflictUnavailable": "Collab の競合解決は利用できません。",
-      "reviewUnavailable": "Collab リクエストのレビューは利用できません。"
+    "quote": {
+      "buttonLabel": "引用"
     },
-    "surfaceLabel": "コラボ",
-    "gitSetup": {
-      "title": "Native Git が必要です",
-      "ready": "Native Git {version} を利用できます。",
-      "missing": "Collab を使用するには Native Git 2.38 以降をインストールしてください。",
-      "incompatible": "この Git は Collab の要件を満たしていません。",
-      "officialGuide": "Git 公式インストールガイドを開く",
-      "agentPrompt": "エージェント用インストールプロンプト",
-      "copyPrompt": "プロンプトをコピー",
-      "rescan": "再スキャン",
-      "manualPath": "詳細 Git パス",
-      "savePath": "パスを保存"
+    "sideChat": {
+      "title": "サイドチャット",
+      "collapse": "折りたたむ",
+      "discard": "破棄",
+      "statusPreparing": "準備中",
+      "statusQueued": "{count} 件待機中",
+      "statusWorking": "実行中",
+      "statusError": "要確認",
+      "statusActionRequired": "入力が必要",
+      "placeholder": "サイドチャットで続けて質問",
+      "composerLabel": "サイドチャットのメッセージ",
+      "needsPrompt": "/side の後にプロンプトを入力してサイドチャットを開始してください。",
+      "unsupportedProvider": "このプロバイダーはサイドチャットに対応していません。",
+      "unavailableBusy": "サイドチャットには完了した返信が必要です。現在のターンの終了をお待ちください。",
+      "unavailableNoCheckpoint": "先にこの会話で返信を完了してからサイドチャットを開始してください。",
+      "unavailableNoSession": "この会話のプロバイダーセッションを解決できませんでした。",
+      "alreadyExists": "この会話にはすでにサイドチャットがあります。破棄してから新しく開始してください。",
+      "nestedUnavailable": "サイドチャットから別のサイドチャットは開始できません。先にメインへ折りたたんでください。",
+      "mainOnlyCommand": "/{command} はメインチャットでのみ使用できます。",
+      "startFailed": "サイドチャットを開始できませんでした：{error}",
+      "queued": "サイドチャットのキューに追加しました。",
+      "busySide": "サイドチャットが応答中です。完了までお待ちください。"
     },
-    "createProject": {
-      "title": "Collab プロジェクトを作成",
-      "projectName": "プロジェクト名",
-      "projectNamePlaceholder": "Research notes",
-      "memberName": "表示名",
-      "memberNamePlaceholder": "Alice",
-      "create": "プロジェクトを作成",
-      "creating": "プロジェクトを作成中...",
-      "createFailed": "プロジェクトを作成できませんでした。",
-      "resumeRequired": "プロジェクトは保存されましたが、セットアップが未完了です。",
-      "resume": "セットアップを再開",
-      "resumeFailed": "セットアップに対応が必要です。もう一度再開してください。"
-    },
-    "joinProject": {
-      "title": "Collab プロジェクトに参加",
-      "invitation": "招待",
-      "invitationPlaceholder": "招待文字列を貼り付け",
-      "memberName": "表示名",
-      "memberNamePlaceholder": "Alice",
-      "join": "プロジェクトに参加",
-      "joining": "プロジェクトに参加しています…",
-      "joinFailed": "プロジェクトに参加できませんでした。",
-      "resumeRequired": "メンバーシップは保存されましたが、セットアップは未完了です。",
-      "resume": "参加を再開",
-      "resumeFailed": "参加処理にはまだ対応が必要です。再試行してください。"
-    },
-    "reconnectProject": {
-      "title": "プロジェクトを再接続",
-      "description": "Host が新しく作成した招待文字列を貼り付けて、{name} に再接続します。",
-      "invitation": "招待",
-      "invitationPlaceholder": "新しい招待文字列を貼り付け",
-      "reconnect": "再接続",
-      "reconnecting": "プロジェクトを再接続しています...",
-      "failed": "プロジェクトを再接続できませんでした。招待を確認して再試行してください。"
-    },
-    "panel": {
-      "title": "Collab",
-      "addProject": "プロジェクトを追加",
-      "createProject": "作成",
-      "projectPicker": "プロジェクトを選択",
-      "emptyDescription": "ローカルプロジェクトを作成するか、別の Claudian ユーザーのプロジェクトに参加します。",
-      "joinProject": "参加",
-      "reconnectProject": "プロジェクトを再接続...",
-      "joinUnavailable": "LAN コラボレーションで利用可能になります。",
-      "openProject": "プロジェクトを開く",
-      "setupIncomplete": "セットアップは未完了ですが、保存済みの authority は安全です。",
-      "workingCopyMissing": "作業コピーがありません。保存済みプロジェクトは削除されていません。",
-      "myChanges": "自分の変更",
-      "myChangesReady": "プロジェクトは準備完了です。変更の公開は次のマイルストーンで追加されます。",
-      "membersAccess": "メンバーとアクセス",
-      "lanHost": "LAN Host",
-      "startHost": "LAN ホストを開始",
-      "stopHost": "ホストを停止",
-      "createInvitation": "招待を作成",
-      "invitation": "招待文字列",
-      "hostUnavailable": "LAN 共有を開始できるのはプロジェクトホストのみです。",
-      "hostRunning": "ホスト実行中",
-      "hostStopped": "Host 停止中",
-      "offline": "オフライン",
-      "manager": "Manager",
-      "member": "メンバー",
-      "loading": "Collab を読み込み中...",
-      "loadFailed": "続行する前に Collab の対応が必要です。",
-      "retry": "再試行"
-    },
-    "projectManagement": {
-      "title": "プロジェクト管理"
-    },
-    "access": {
-      "memberCount": "メンバー {count} 人",
-      "noMembers": "利用可能なメンバーはいません。",
-      "loading": "メンバーを読み込み中…",
-      "loadFailed": "メンバーを読み込めませんでした。",
-      "retry": "再試行",
-      "invitations": "招待",
-      "createInvitation": "招待を作成",
-      "creatingInvitation": "招待を作成中…",
-      "invitation": "招待文字列",
-      "copyInvitation": "招待をコピー",
-      "revokeInvitation": "招待を取り消す",
-      "invitationCopied": "招待をコピーしました。",
-      "invitationRevoked": "招待を取り消しました。",
-      "invitationFailed": "招待操作を完了できませんでした。",
-      "copyFailed": "招待をコピーできませんでした。",
-      "manager": "Manager",
-      "managerCount": "Manager: {count}",
-      "host": "Host",
-      "you": "自分",
-      "status": {
-        "active": "参加中",
-        "pending": "保留中",
-        "revoked": "削除済み",
-        "left": "退出済み"
-      },
-      "makeManager": "Manager にする",
-      "makeMember": "メンバーにする",
-      "completePromotion": "昇格を完了",
-      "promotionPending": "確認待ち",
-      "cancelPromotion": "昇格をキャンセル",
-      "cancelManagerSuccession": "後継者の選択をキャンセル",
-      "removeMember": "削除",
-      "leaveProject": "プロジェクトから退出",
-      "hostRemovalBlocked": "LAN Host のメンバーシップは削除できません。",
-      "confirmPromote": "{name} を Manager にしますか？両方が Manager のままになります。",
-      "confirmDemote": "{name} をメンバーにしますか？",
-      "demoteHostUnchanged": "変更されるのは役割だけです。LAN Host の場合、Host の責任はそのまま維持されます。",
-      "confirmRemove": "{name} をコラボレーションから削除しますか？",
-      "confirmLeave": "このコラボレーションから退出しますか？",
-      "removedFilesRetained": "相手のローカルプロジェクトファイルと履歴は、そのデバイスに残ります。",
-      "confirm": "確認",
-      "actionFailed": "アクセス変更を完了できませんでした。安全に再試行できます。",
-      "transferHost": "Transfer Host",
-      "acceptHost": "Accept Host",
-      "decline": "Decline",
-      "cancelTransfer": "Cancel transfer",
-      "managerSuccessorRequired": "Choose a successor before leaving.",
-      "lastManagerRequired": "少なくとも 1 人の Manager が必要です。",
-      "chooseManagerSuccessor": "Choose a successor to receive Manager responsibility.",
-      "waitingForManagerAcknowledgement": "{name} が Manager の責任を確認するのを待っています。",
-      "managerSuccessorAcknowledged": "後継者が確認しました。退出できます。",
-      "hostTransferRequired": "Transfer Host before leaving.",
-      "retireProject": "Retire project",
-      "confirmRetire": "Retire this project for everyone?",
-      "leaveCleanupWarning": "Choose what happens to this local copy. Git history and unpublished Git-only work cannot be recovered after cleanup.",
-      "retireWarning": "This ends collaboration for every Member. Visible files remain on each device, but collaboration history and Git-only work are not recoverable.",
-      "actionComplete": "アクセスを更新しました。"
-    },
-    "host": {
-      "summary": "LAN Host",
-      "hostedHere": "このデバイスでホスト中",
-      "hostedElsewhere": "別のデバイスでホスト中",
-      "legacyClaimConfirmation": "このデバイスを Host の所有デバイスとして使用しますか？",
-      "legacyClaimAction": "このデバイスを使用",
-      "status": {
-        "stopped": "停止中",
-        "starting": "起動中",
-        "running": "実行中",
-        "stopping": "停止処理中",
-        "needsAttention": "確認が必要"
-      },
-      "start": "Host を起動",
-      "starting": "Host を起動中…",
-      "stop": "Host を停止",
-      "stopping": "Host を停止中…",
-      "diagnostics": "診断",
-      "copyDiagnostics": "Copy diagnostics",
-      "diagnosticsCopied": "Diagnostics copied.",
-      "diagnosticsCopyFailed": "Diagnostics could not be copied.",
-      "retry": "再試行",
-      "startFailed": "Host を起動できませんでした。診断を確認して再試行してください。",
-      "stopFailed": "Host を正常に停止できませんでした。診断を確認して再試行してください。"
-    },
-    "publish": {
-      "title": "自分の変更",
-      "loading": "変更を確認しています…",
-      "updateAvailable": "更新があります",
-      "clean": "最新です",
-      "changedFiles": "{count} 件の変更ファイル",
-      "action": "公開",
-      "publishing": "公開中…",
-      "offline": "オフライン · 変更はローカルに保存済み",
-      "pushed": "変更を Host に送信しました",
-      "awaitingRequest": "リクエストの同期待ち",
-      "conflict": "競合の確認が必要です",
-      "cancelled": "公開をキャンセルしました",
-      "error": "公開に対応が必要です",
-      "description": "Description",
-      "descriptionRequired": "Add a description before publishing.",
-      "descriptionPlaceholder": "Describe this review point. Use #171 to reference a Ticket or Fixes #171 to resolve it.",
-      "saveDescription": "Save description",
-      "savingDescription": "Saving description…",
-      "descriptionSaved": "Description saved.",
-      "descriptionNotSynced": "Local draft — not synced.",
-      "descriptionSaveFailed": "Could not save the description.",
-      "references": "References",
-      "resolves": "Resolves",
-      "fileKind": {
-        "added": "追加",
-        "modified": "変更",
-        "deleted": "削除",
-        "renamed": "名前変更",
-        "copied": "コピー",
-        "typeChanged": "種類変更"
-      }
-    },
-    "review": {
-      "title": "変更をレビュー",
-      "publicationTitle": "公開前にレビュー",
-      "reviewAndPublish": "レビューして公開",
-      "confirmPublish": "確認して公開",
-      "confirmingPublish": "公開中…",
-      "confirmPublishFailed": "変更を公開できませんでした",
-      "readyToPublish": "公開できます",
-      "openRequest": "チームの変更を開いてレビューします。",
-      "loading": "レビューを読み込み中…",
-      "loadFailed": "変更されたか読み込めませんでした。もう一度開いてください。",
-      "fileCount": "変更されたファイル: {count}",
-      "sections": "レビューセクション",
-      "overview": "概要",
-      "changes": "変更 ({count})",
-      "scope": "ファイル範囲",
-      "currentFile": "現在のファイル",
-      "allFiles": "すべてのファイル",
-      "openFile": "このファイルを開く",
-      "layout": "差分レイアウト",
-      "unified": "統合表示",
-      "split": "左右分割",
-      "clean": "承認可能",
-      "conflicting": "競合の解決が必要です",
-      "stale": "新しい変更が公開されています",
-      "noFiles": "変更されたファイルはありません",
-      "loadingFile": "ファイルを読み込み中…",
-      "accept": "変更を承認",
-      "acceptRequiresSync": "Reconnect and synchronize with the Host before accepting.",
-      "largeText": "このテキストファイルは大きすぎるため行単位でレビューできません。",
-      "binary": "バイナリファイル",
-      "fileSize": "変更前: {oldSize} · 変更後: {newSize}",
-      "fileLoadFailed": "このファイルをレビュー用に読み込めませんでした。",
-      "accepting": "承認中…",
-      "accepted": "変更を承認しました",
-      "acceptFailed": "変更を承認できませんでした"
-    },
-    "tickets": {
-      "editorTitle": "Ticket",
-      "sectionTitle": "Tickets",
-      "open": "Open",
-      "closed": "Closed",
-      "add": "Add Ticket",
-      "loading": "Loading Tickets…",
-      "loadMore": "Load more",
-      "offlineReadOnly": "Offline · showing saved Tickets read-only",
-      "offlineCreateUnavailable": "Reconnect to create a Ticket.",
-      "offlineCacheUnavailable": "No saved Tickets are available offline.",
-      "loadFailed": "Tickets could not be loaded.",
-      "empty": "No Tickets",
-      "createTitle": "Create Ticket",
-      "create": "Create Ticket",
-      "title": "Title",
-      "body": "Description",
-      "save": "Save",
-      "saving": "Saving…",
-      "saveFailed": "The Ticket could not be saved.",
-      "close": "Close",
-      "reopen": "Reopen",
-      "acceptedChanges": "Accepted changes",
-      "noAcceptedChanges": "No accepted changes reference this Ticket.",
-      "resolvedBy": "Resolved by",
-      "referencedBy": "Referenced by",
-      "activity": "アクティビティ ({count})",
-      "comments": "Comments ({count})",
-      "addComment": "Add a comment",
-      "comment": "Comment"
-    },
-    "conflict": {
-      "title": "競合を表示",
-      "requestTitle": "リクエストの競合",
-      "myChangesTitle": "自分の変更の競合",
-      "fileCount": "競合ファイル {count} 件",
-      "editAndPublish": "プロジェクトファイルを編集して、もう一度公開してください。",
-      "loading": "競合を読み込み中…",
-      "loadFailed": "競合を読み込めませんでした。もう一度お試しください。",
-      "loadingFile": "ファイルの各バージョンを読み込み中…",
-      "fileLoadFailed": "このファイルを読み込めませんでした。",
-      "kind": {
-        "text": "テキストの競合",
-        "binary": "バイナリファイル",
-        "deleteModify": "一方で削除済み",
-        "renameDelete": "一方で名前変更済み",
-        "directoryFile": "ファイルとフォルダーの競合",
-        "portability": "ファイル名の競合"
-      },
-      "mine": "自分のバージョン",
-      "accepted": "承認済みバージョン",
-      "deleted": "削除済み",
-      "sideSummary": "{path} · {size}",
-      "blocking": "この競合は自動解決できません。Collab の外で対象ファイルの名前を変更してから再試行してください。",
-      "reload": "競合を再読み込み"
-    },
-    "team": {
-      "title": "チームの変更",
-      "loading": "変更リクエストを読み込み中…",
-      "loadFailed": "変更リクエストを読み込めませんでした。",
-      "retry": "再試行",
-      "stale": "保存済みの変更リクエストを表示中 · オフライン",
-      "empty": "オープンな変更はありません",
-      "unknownMember": "不明なメンバー",
-      "ownMember": "あなた",
-      "comments": "コメント {count} 件"
-    },
-    "comments": {
-      "title": "コメント ({count})",
-      "empty": "コメントはまだありません",
-      "input": "コメントを追加",
-      "placeholder": "背景やフィードバックを追加…",
-      "required": "コメントを入力してください。",
-      "tooLarge": "コメントが大きすぎます。",
-      "submitFailed": "コメントを追加できませんでした。",
-      "submit": "コメント",
-      "submitting": "追加中…",
-      "retry": "コメントを再試行",
-      "outdated": "古いコメント"
-    },
-    "retired": {
-      "title": "Retired",
-      "ended": "Collaboration ended on {date}.",
-      "unknownDate": "an unknown date",
-      "files": "Your current files are still in {path}.",
-      "keepFiles": "Keep files",
-      "deleteFiles": "Delete files",
-      "retryCleanup": "Retry cleanup",
-      "finishingCleanup": "Finishing local cleanup…",
-      "cleanupFailed": "Project cleanup needs attention. Retry when ready."
+    "zen": {
+      "regionLabel": "Claudian チャット",
+      "showHistory": "会話を表示",
+      "working": "処理中…",
+      "thinking": "思考中…",
+      "interrupted": "中断されました",
+      "workedFor": "{duration} 作業しました",
+      "workedForResult": "{duration} 作業しました · {result}",
+      "actionRequired": "入力が必要です",
+      "error": "エラー: {message}",
+      "toolRunning": "{tool} · 実行中",
+      "toolCompleted": "{tool} · 完了",
+      "toolFailed": "{tool} · 失敗",
+      "toolBlocked": "{tool} · ブロック"
     }
   },
   "settings": {
-    "title": "Claudian 設定",
     "tabs": {
       "general": "一般",
-      "collab": "コラボレーション",
       "providers": "プロバイダー",
-      "claude": "Claude",
-      "codex": "Codex"
+      "skills": "スキル"
+    },
+    "providerSettings": {
+      "unavailable": "プロバイダー設定を利用できません。",
+      "loadFailed": "プロバイダー設定を読み込めませんでした: {message}"
     },
     "display": "表示",
     "conversations": "会話",
     "content": "コンテンツ",
     "input": "入力",
-    "setup": "セットアップ",
     "models": "モデル",
     "experimental": "実験的機能",
     "userName": {
@@ -451,7 +134,8 @@
     "titleModel": {
       "name": "タイトル生成モデル",
       "desc": "会話タイトルを自動生成するために使用されるモデル。",
-      "auto": "自動 (Haiku)"
+      "select": "モデルを選択",
+      "unavailableWarning": "タイトルの自動生成は一時停止中です。利用可能なタイトル用モデルを選択してください。"
     },
     "navMappings": {
       "name": "Vimスタイルナビゲーションマッピング",
@@ -471,73 +155,10 @@
     "newSessionHotkey": {
       "name": "現在の会話を置き換える"
     },
-    "newTabHotkey": {
-      "name": "新規"
-    },
-    "closeTabHotkey": {
-      "name": "タブを閉じる"
-    },
-    "slashCommands": {
-      "name": "コマンドとスキル",
-      "desc": ".claude/commands/ と .claude/skills/ に保存された Vault レベルのコマンドとスキルを管理します。/名前 でトリガーされます。"
-    },
-    "hiddenSlashCommands": {
-      "name": "非表示のコマンドとスキル",
-      "desc": "ドロップダウンから特定のコマンドとスキルを非表示にします。Claudian に関係のない Claude Code の項目を隠すのに便利です。先頭のスラッシュなしで名前を1行に1つ入力してください。",
-      "placeholder": "commit\nbuild\ntest"
-    },
-    "mcpServers": {
-      "name": "MCP サーバー",
-      "descBeforeCommand": "Claude Code は独自の CLI で MCP サーバーを管理します。",
-      "descAfterCommand": " で設定すると Claudian で利用できます。",
-      "learnMore": "詳しく見る"
-    },
-    "plugins": {
-      "name": "Claude Code プラグイン",
-      "desc": "~/.claude/plugins から検出された Claude Code プラグインを管理します。有効化されたプラグインは Vault ごとに .claude/settings.json に保存されます。"
-    },
-    "subagents": {
-      "name": "サブエージェント",
-      "desc": ".claude/agents/ に保存された Vault レベルのサブエージェントを管理します。各 Markdown ファイルがカスタムエージェントを1つ定義します。",
-      "noAgents": "サブエージェントが設定されていません。+ をクリックして作成してください。",
-      "deleteConfirm": "サブエージェント「{name}」を削除しますか？",
-      "saveFailed": "サブエージェントの保存に失敗しました: {message}",
-      "refreshFailed": "サブエージェントを更新できませんでした: {message}",
-      "deleteFailed": "サブエージェントの削除に失敗しました: {message}",
-      "renameCleanupFailed": "警告: 「{name}」の古いファイルを削除できませんでした",
-      "created": "サブエージェント「{name}」を作成しました",
-      "updated": "サブエージェント「{name}」を更新しました",
-      "deleted": "サブエージェント「{name}」を削除しました",
-      "duplicateName": "「{name}」という名前のエージェントは既に存在します",
-      "descriptionRequired": "説明は必須です",
-      "promptRequired": "システムプロンプトは必須です",
-      "modal": {
-        "titleEdit": "サブエージェントを編集",
-        "titleAdd": "サブエージェントを追加",
-        "name": "名前",
-        "nameDesc": "小文字、数字、ハイフンのみ使用できます",
-        "namePlaceholder": "code-reviewer",
-        "description": "説明",
-        "descriptionDesc": "このエージェントの簡単な説明",
-        "descriptionPlaceholder": "コードのバグやスタイルをレビューします",
-        "advancedOptions": "詳細オプション",
-        "model": "モデル",
-        "modelDesc": "このエージェントのモデル上書き",
-        "tools": "ツール",
-        "toolsDesc": "許可するツールのカンマ区切りリスト（空欄 = すべて）",
-        "disallowedTools": "禁止ツール",
-        "disallowedToolsDesc": "禁止するツールのカンマ区切りリスト",
-        "skills": "スキル",
-        "skillsDesc": "スキルのカンマ区切りリスト",
-        "prompt": "システムプロンプト",
-        "promptDesc": "エージェントへの指示",
-        "promptPlaceholder": "あなたはコードレビュアーです。与えられたコードを分析して..."
-      }
-    },
     "safety": "セキュリティ",
     "loadUserSettings": {
-      "name": "ユーザーClaude設定を読み込む",
-      "desc": "~/.claude/settings.json を読み込みます。有効にすると、ユーザーの Claude Code 許可ルールがセキュリティモードをバイパスする可能性があります。"
+      "name": "ユーザーの Claude Code 設定を読み込む",
+      "desc": "~/.claude からユーザーレベルの Claude Code 設定（settings.json、スキル、コマンド、エージェント、プラグイン）を読み込みます。無効にすると、Vault レベルの設定のみ利用できます。有効にすると、ユーザーの許可ルールがセキュリティモードをバイパスする可能性があります。"
     },
     "permissionDestination": {
       "name": "「常に許可」ルールの保存先",
@@ -545,24 +166,25 @@
       "localSettings": "ローカル設定",
       "projectSettings": "プロジェクト設定"
     },
-    "claudeSafeMode": {
-      "name": "セーフモード",
-      "desc": "Safe トグルが有効なときに使用する権限モードです。"
-    },
     "codexSafeMode": {
       "name": "セーフモード",
       "desc": "Safe トグルが有効なときに使用するサンドボックスモードです。"
     },
     "environment": "環境",
+    "sharedEnvironment": {
+      "name": "共有環境",
+      "desc": "すべてのプロバイダーで共有される、プロバイダー非依存のランタイム変数。PATH、プロキシ、証明書、一時ディレクトリの変数に使用します。"
+    },
     "customVariables": {
       "name": "カスタム変数",
-      "desc": "Claude SDKの環境変数（KEY=VALUE形式、1行に1つ）。exportプレフィックス対応。"
+      "desc": "Claude Code が所有するランタイム変数のみ。ANTHROPIC_* と Claude Code 固有の切り替えに使用します。"
     },
     "envSnippets": {
       "name": "スニペット",
       "addBtn": "スニペットを追加",
       "noSnippets": "保存された環境変数スニペットはありません。+をクリックして現在の設定を保存してください。",
       "nameRequired": "スニペットの名前を入力してください",
+      "insert": "挿入",
       "modal": {
         "titleEdit": "スニペットを編集",
         "titleSave": "スニペットを保存",
@@ -575,58 +197,30 @@
         "save": "保存",
         "update": "更新",
         "cancel": "キャンセル"
-      }
+      },
+      "insertFailed": "スニペットの挿入に失敗しました",
+      "deleteConfirm": "環境変数スニペット「{name}」を削除しますか?",
+      "deleteFailed": "スニペットの削除に失敗しました"
     },
     "customModelOverrides": {
       "name": "カスタムモデルの上書き",
       "desc": "カスタムモデルのモデルセレクター表示名とコンテキストウィンドウサイズを設定します。"
     },
     "customModelAliases": {
-      "placeholder": "エイリアス"
+      "placeholder": "エイリアス",
+      "ariaLabel": "{model} のエイリアス",
+      "ariaDescription": "モデルセレクターに表示されるカスタムラベル。空欄の場合はデフォルトを使用します。"
     },
     "customContextLimits": {
-      "name": "カスタムコンテキスト制限",
-      "desc": "カスタムモデルのコンテキストウィンドウサイズを設定します。デフォルト（200kトークン）を使用する場合は空欄のままにしてください。",
       "invalid": "無効な形式です。使用：256k、1m、または正確な数値（1000-10000000）。"
-    },
-    "customModels": {
-      "name": "カスタムモデル",
-      "desc": "追加の Claude モデル ID を1行に1つずつピッカーに追加します。環境変数によるモデル上書きは引き続きピッカーを置き換えます。",
-      "placeholder": "claude-opus-4-6\nclaude-opus-4-5-20251101"
     },
     "enableChrome": {
       "name": "Chrome拡張機能を有効化",
-      "desc": "claude-in-chrome拡張機能を通じてClaudeがChromeと連携できるようにします。拡張機能のインストールが必要です。セッションの再起動が必要です。"
+      "desc": "claude-in-chrome 拡張機能を通じて Claude Code が Chrome と連携できるようにします。拡張機能のインストールが必要です。セッションの再起動が必要です。"
     },
     "maxWarmAgentProcesses": {
       "name": "同時実行セッションの上限",
       "desc": "同時に実行準備状態を保つエージェントセッションの最大数（5-10）。古いアイドルセッションは自動的に一時停止し、使用時に再開します。"
-    },
-    "collabGitInstallation": {
-      "summary": "Git セットアップのヘルプ",
-      "requirement": "Claudian Collab は、このコンピューターにインストールされた Native Git 2.38 以降を使用します。",
-      "verify": "Claudian にインストールの確認を依頼してください：",
-      "prompt": "このコンピューターの Git インストールを確認してください。\n1. Git がインストールされているか、実行ファイルのパス、バージョンを報告してください。\n2. Git がインストールされていない場合は、このデバイスへのインストール方法を案内してください。\n3. インストールや変更は行わないでください。"
-    },
-    "collabGitStatus": {
-      "checking": "Git を確認中…",
-      "available": "Git 実行ファイルを検出しました",
-      "unavailable": "Git 実行ファイルが見つかりません"
-    },
-    "collabReadMore": "Claudian Collab モードの詳細を見る",
-    "collabGitPath": {
-      "name": "Native Git のパス",
-      "desc": "Collab で使用する Native Git の絶対パス（任意）。空欄の場合は自動検出します。",
-      "placeholder": "Git を自動検出"
-    },
-    "collabEnabled": {
-      "name": "Collab を有効化",
-      "desc": "この Vault でローカル共同作業、Collab 参照、Agent Runtime を有効にします。"
-    },
-    "collabProjectsFolder": {
-      "name": "プロジェクトフォルダー",
-      "desc": "今後の Collab プロジェクト用の Vault 相対パスです。事前作成は不要で、次回の作成または参加時に Claudian が作成または所有します。既存プロジェクトの場所は変わりません。",
-      "placeholder": "workspace"
     },
     "enableDualPane": {
       "name": "デュアルペインモードを有効化",
@@ -635,10 +229,6 @@
     "restoreTabsOnStartup": {
       "name": "起動時にタブを復元",
       "desc": "シングルペインモードではすべてのタブを、デュアルペインモードでは最後にアクティブだったタブのみを再度開きます。"
-    },
-    "enableFilePane": {
-      "name": "ファイルペインを有効化",
-      "desc": "デュアルペインモードのセッションマネージャーに「ファイル」タブを表示します。"
     },
     "dualPaneSide": {
       "name": "デュアルペインの位置",
@@ -669,14 +259,31 @@
       "leftSidebar": "左サイドバー",
       "mainTab": "メインエディタタブ"
     },
+    "enableZenMode": {
+      "name": "Zen モードを有効化",
+      "desc": "サイドバーが非表示のときも、最小限のチャット UI を表示します。"
+    },
+    "cliInstallation": {
+      "disclosure": "{name} のインストール",
+      "description": "このコンピューター用の任意の CLI パス。空欄で自動検出します。",
+      "checking": "CLI を確認中…",
+      "versionUnavailable": "バージョンを取得できません",
+      "notFound": "見つかりません",
+      "custom": "カスタムパス",
+      "auto": "自動検出",
+      "checkFailed": "CLI を確認できません",
+      "saveFailed": "パスを保存できません。再試行してください。"
+    },
     "cliPath": {
-      "name": "Claude CLI パス",
-      "desc": "Claude Code CLI のカスタムパス。空欄で自動検出を使用。",
-      "descWindows": "ネイティブインストーラーの場合は claude.exe を使用。npm/pnpm/yarn やその他のパッケージマネージャーでのインストールの場合は cli-wrapper.cjs パスを使用（claude.cmd ではない）。",
-      "descUnix": "\"which claude\" の出力を貼り付けてください - ネイティブと npm/pnpm/yarn インストールの両方で動作します。",
+      "name": "Claude Code CLI パス",
+      "genericName": "CLI パス",
       "validation": {
         "notExist": "パスが存在しません",
-        "isDirectory": "パスはディレクトリでファイルではありません"
+        "isDirectory": "パスはディレクトリでファイルではありません",
+        "mustBeAbsolute": "パスは絶対パスである必要があります",
+        "notFile": "パスはファイルを指している必要があります",
+        "notAccessible": "パスにアクセスできません",
+        "notExecutable": "パスは実行可能である必要があります"
       }
     },
     "language": {
@@ -685,22 +292,57 @@
     },
     "providerEnablement": {
       "name": "{provider} を有効化",
-      "desc": "有効にした {provider} モデルを新しい会話で使用できるようにします。無効にしても既存のセッションは保持されます。",
       "lastProviderWarning": "Claudian を使用するには、少なくとも 1 つのプロバイダーを有効にする必要があります。",
       "noModelsWarning": "有効な {provider} モデルがありません。下の「モデル」で少なくとも1つのモデルを有効にしてください。"
+    },
+    "modelPicker": {
+      "name": "表示するモデル",
+      "desc": "チャットのセレクターで利用できるモデルを選択します。ドラッグして並べ替えられます。プロバイダーは現在利用可能な最初のモデルをデフォルトとして使用します。このプロバイダーを使うには少なくとも1つのモデルを選択してください。",
+      "browse": "モデルを参照",
+      "filterLabel": "{provider} モデルを絞り込む",
+      "searchPlaceholder": "モデル、プロバイダー、ID で絞り込み...",
+      "providerFilterLabel": "モデルプロバイダーを絞り込む",
+      "allProviders": "すべてのプロバイダー ({count})",
+      "discover": "検出",
+      "visible": "表示: ",
+      "ofDiscovered": " / 検出 {count}",
+      "oneProvider": " | 1 プロバイダー",
+      "manyProviders": " | {count} プロバイダー",
+      "loadingModels": "モデルを読み込んでいます...",
+      "loading": "読み込み中...",
+      "available": "{count} 件利用可能",
+      "noneDiscovered": "まだモデルが検出されていません",
+      "selected": "選択済み ({count})",
+      "clearAllLabel": "選択したすべての {provider} モデルをクリア",
+      "reorderLabel": "{model} を並べ替え。ドラッグするか上下の矢印キーを使用します",
+      "default": "デフォルト",
+      "unavailable": "利用不可",
+      "unavailableTitle": "設定済みのモデルは現在 {provider} から報告されていません",
+      "aliasLabel": "エイリアス(任意)",
+      "removeLabel": "{model} を削除",
+      "noMatch": "フィルターに一致するモデルはありません。",
+      "emptyCatalog": "{provider} からモデルが報告されていません。設定を確認して「検出」をクリックしてください。",
+      "loadingCatalog": "{provider} モデルを読み込んでいます…",
+      "stale": "{provider} のモデルカタログが古くなっています。「検出」をクリックして更新してください。"
+    },
+    "claude": {
+      "configuration": "構成",
+      "responseStyle": {
+        "name": "応答スタイル",
+        "desc": "デフォルトは Claude Code の通常のスタイルです。簡潔モードは結果を先に示し、前置きを省きます。Claude Code 2.1.237 以降が必要です。",
+        "default": "デフォルト",
+        "concise": "簡潔"
+      }
     },
     "codex": {
       "installationMethod": {
         "name": "インストール方式",
-        "desc": "Windows で Claudian が Codex を起動する方法。ネイティブ Windows は Windows 実行ファイルパスを使い、WSL は選択したディストリビューション内で Linux CLI を起動します。",
+        "desc": "Windows で Claudian が Codex CLI を起動する方法。ネイティブ Windows は Windows 実行ファイルパスを使い、WSL は選択したディストリビューション内で Linux CLI を起動します。",
         "nativeWindows": "ネイティブ Windows",
         "wsl": "WSL"
       },
       "cliPath": {
         "name": "Codex CLI パス",
-        "descUnix": "ローカル Codex CLI のカスタムパス。空欄の場合は既知の Codex インストール、次に PATH を優先します。",
-        "descWindows": "ローカル Codex CLI のカスタムパス。空欄の場合は PATH から自動検出します。通常は `codex.exe` のネイティブ Windows 実行ファイルパスを使用してください。",
-        "descWsl": "WSL 内で実行する Linux 側の Codex コマンドまたは絶対パス。空欄の場合は選択したディストリビューション内の PATH を検索します。",
         "validation": {
           "wslWindowsPath": "WSL モードでは Windows 実行ファイルパスではなく、Linux コマンドまたは Linux 絶対パスが必要です。"
         }
@@ -713,10 +355,11 @@
         "workspaceWrite": "ワークスペース書き込み",
         "readOnly": "読み取り専用"
       },
-      "customModels": {
-        "name": "カスタムモデル",
-        "desc": "追加の Codex モデル ID を1行に1つずつピッカーに追加します。`OPENAI_MODEL` が設定されている場合は引き続き優先されます。",
-        "placeholder": "gpt-5.4\ngpt-5.3-codex-spark"
+      "responseStyle": {
+        "name": "応答スタイル",
+        "desc": "対応モデルでの Codex CLI の話し方を選択します。次のメッセージから適用されます。",
+        "pragmatic": "実用的",
+        "friendly": "フレンドリー"
       },
       "reasoningSummary": {
         "name": "推論サマリー",
@@ -730,101 +373,152 @@
         "name": "Ultra 推論レベルを有効化",
         "desc": "Ultra をサポートする Codex モデルの推論レベル選択に表示します。Ultra は最大限の推論とタスクの自動委任を使用します。"
       },
-      "skills": {
-        "name": "Codex スキル",
-        "desc": "Manage shared vault-level skills stored only in .agents/skills/.",
-        "hiddenName": "非表示のスキル",
-        "hiddenDesc": "特定の Codex スキルをドロップダウンから非表示にします。先頭の $ なしでスキル名を1行に1つ入力してください。",
-        "hiddenPlaceholder": "analyze\nexplain\nfix"
-      },
-      "subagents": {
-        "name": "Codex サブエージェント",
-        "desc": ".codex/agents/ に保存された Vault レベルの Codex サブエージェントを管理します。各 TOML ファイルがカスタムエージェントを1つ定義します。"
-      },
-      "mcp": {
-        "descBeforeCommand": "Codex は独自の CLI で MCP サーバーを管理します。",
-        "descAfterCommand": " で設定すると Claudian で利用できます。",
-        "learnMore": "詳しく見る"
-      },
       "environment": {
-        "name": "Codex 環境",
-        "desc": "Codex が所有するランタイム変数のみ。OPENAI_* と CODEX_* 設定に使用します。Codex の自動検出に補助が必要な場合は、このプロバイダー環境ではなく共有 PATH にインストールディレクトリを追加してください。"
+        "name": "Codex CLI 環境",
+        "desc": "Codex CLI が所有するランタイム変数のみ。OPENAI_* と CODEX_* 設定に使用します。Codex CLI の自動検出に補助が必要な場合は、このプロバイダー環境ではなく共有 PATH にインストールディレクトリを追加してください。"
       }
     },
     "agentSkills": {
-      "sectionTitle": "Skills", "fixedRoot": "Managed in .agents/skills", "sharedExpectation": "Manage shared skills in .agents/skills/ for compatible providers.", "noSkills": "No shared skills configured. Click + to create one.", "skillBadge": "skill", "diagnosticsTitle": "Skills needing attention", "loadFailed": "Could not load shared skills.", "savedRefreshFailed": "Saved, but provider refresh failed.", "validationFailed": "Invalid skill: {message}", "collisionFailed": "A skill named \"{name}\" already exists.", "saveFailed": "Failed to save shared skill: {message}", "deleteFailed": "Failed to move shared skill to trash: {message}", "staleConflict": "This skill changed elsewhere; refresh before saving.", "created": "Shared skill \"{name}\" created.", "updated": "Shared skill \"{name}\" updated.", "deleted": "Shared skill \"{name}\" moved to trash.",
-      "modal": { "titleEdit": "Edit Shared Skill", "titleAdd": "Add Shared Skill", "name": "Skill name", "nameDesc": "Lowercase letters and numbers separated by single hyphens", "namePlaceholder": "code-reviewer", "description": "Description", "descriptionDesc": "Required portable description used by providers to select the skill", "descriptionPlaceholder": "Reviews code for correctness and maintainability", "instructions": "Instructions", "instructionsDesc": "Required SKILL.md instructions", "instructionsPlaceholder": "Review the supplied code and report actionable findings..." },
-      "delete": { "title": "Delete Shared Skill", "description": "The entire skill folder, including scripts, references, and assets, will be moved to trash.", "confirm": "Move to trash" }
-    },
-    "codexSkills": {
-      "modal": {
-        "titleEdit": "Codex スキルを編集",
-        "titleAdd": "Codex スキルを追加",
-        "directory": "ディレクトリ",
-        "directoryDesc": "スキルの保存先",
-        "skillName": "スキル名",
-        "skillNameDesc": "$ の後に使う名前（例: $analyze の場合は \"analyze\"）",
-        "description": "説明",
-        "descriptionDesc": "ドロップダウンに表示される任意の説明",
-        "instructions": "指示",
-        "instructionsDesc": "スキルの指示（SKILL.md の内容）",
-        "instructionsPlaceholder": "Analyze the code for..."
-      },
-      "instructionsRequired": "指示は必須です",
-      "saveFailed": "Codex スキルの保存に失敗しました",
-      "header": "Codex スキル",
-      "noSkills": "Vault に Codex スキルがありません。+ をクリックして作成してください。",
+      "sharedExpectation": "対応プロバイダー向けに .agents/skills/ の共有スキルを管理します。",
+      "noSkills": "共有スキルは設定されていません。+ をクリックして作成してください。",
       "skillBadge": "スキル",
-      "deleted": "Codex スキル「{name}」を削除しました",
-      "deleteFailed": "Codex スキルの削除に失敗しました",
-      "created": "Codex スキル「{name}」を作成しました",
-      "updated": "Codex スキル「{name}」を更新しました"
-    },
-    "codexSubagents": {
+      "diagnosticsTitle": "確認が必要なスキル",
+      "loadFailed": "共有スキルを読み込めませんでした。",
+      "savedRefreshFailed": "保存しましたが、プロバイダーの更新に失敗しました。",
+      "validationFailed": "無効なスキル: {message}",
+      "collisionFailed": "「{name}」という名前のスキルはすでに存在します。",
+      "saveFailed": "共有スキルの保存に失敗しました: {message}",
+      "deleteFailed": "共有スキルをゴミ箱に移動できませんでした: {message}",
+      "staleConflict": "このスキルは別の場所で変更されました。保存する前に更新してください。",
+      "created": "共有スキル「{name}」を作成しました。",
+      "updated": "共有スキル「{name}」を更新しました。",
+      "deleted": "共有スキル「{name}」をゴミ箱に移動しました。",
+      "fix": "修正",
+      "fixed": "スキル「{name}」を修正しました。",
       "modal": {
-        "titleEdit": "Codex サブエージェントを編集",
-        "titleAdd": "Codex サブエージェントを追加",
-        "nameDesc": "Codex が起動時に使用するエージェント名（小文字、ハイフン、アンダースコア）",
-        "descriptionDesc": "Codex がこのエージェントを使うべきタイミング",
-        "modelDesc": "モデル上書き（空欄で継承）",
-        "namePlaceholder": "code_reviewer"
+        "titleEdit": "共有スキルを編集",
+        "titleAdd": "共有スキルを追加",
+        "titleFix": "スキルを修正",
+        "name": "スキル名",
+        "nameDesc": "小文字と数字を単一のハイフンで区切ったもの",
+        "namePlaceholder": "code-reviewer",
+        "description": "説明",
+        "descriptionDesc": "プロバイダーがスキルを選択するために使う、移植可能な必須の説明",
+        "descriptionPlaceholder": "コードの正確性と保守性をレビューします",
+        "instructions": "指示",
+        "instructionsDesc": "SKILL.md の必須の指示",
+        "instructionsPlaceholder": "提供されたコードをレビューし、対応可能な指摘を報告してください..."
       },
-      "reasoningEffort": {
-        "name": "推論強度",
-        "desc": "モデル推論強度レベル",
-        "inherit": "継承",
-        "low": "低",
-        "medium": "中",
-        "high": "高",
-        "xhigh": "非常に高い"
+      "delete": {
+        "title": "共有スキルを削除",
+        "description": "スクリプト、参照資料、アセットを含むスキルフォルダー全体がゴミ箱に移動されます。",
+        "confirm": "ゴミ箱に移動"
+      }
+    },
+    "opencode": {
+      "environment": {
+        "name": "OpenCode 環境変数",
+        "desc": "OpenCode に渡す追加の環境変数。"
       },
-      "sandboxMode": {
-        "name": "サンドボックスモード",
-        "desc": "このエージェントのサンドボックス制限",
-        "inherit": "継承",
-        "readOnly": "読み取り専用",
-        "dangerFullAccess": "完全アクセス",
-        "workspaceWrite": "ワークスペース書き込み"
+      "migrationNotice": {
+        "text": "Claudian は OpenCode v2 に対応しました。OpenCode v1 のサポートは 2026年10月30日に終了します。",
+        "link": "OpenCode v2 に移行"
+      }
+    },
+    "pi": {
+      "environment": {
+        "name": "Pi 環境変数",
+        "desc": "Pi にのみ渡す環境変数。"
+      }
+    },
+    "grok": {
+      "environment": {
+        "name": "Grok Build 環境変数",
+        "desc": "Grok Build にのみ渡す環境変数。カスタムモデルのシークレットはこのプロバイダーのスコープ内に留まり、ネイティブ設定からは env_key で参照されます。"
+      }
+    },
+    "skills": {
+      "subTabs": {
+        "claude": "Claude Code",
+        "shared": "その他のプロバイダー"
       },
-      "nicknameCandidates": {
-        "name": "ニックネーム候補",
-        "desc": "表示ニックネームをカンマ区切りで指定（例: atlas, delta, echo）"
+      "claudeHelp": ".claude/skills/ の Claude Code スキルと .claude/commands/ のコマンド。",
+      "sharedHelp": "Codex CLI、OpenCode、Pi、Grok Build 用の .agents/skills/ にある共有スキル。",
+      "status": {
+        "error": "スキルフォルダーを読み取れませんでした: {message}"
       },
-      "developerInstructions": {
-        "name": "開発者指示",
-        "desc": "エージェントの動作を定義する中核の指示",
-        "placeholder": "Review code like an owner.\nPrioritize correctness, security, and missing test coverage.",
-        "required": "開発者指示は必須です"
+      "synced": "同期済み",
+      "actions": {
+        "sync": "同期",
+        "resync": "再同期"
       },
-      "validation": {
-        "nameRequired": "サブエージェント名は必須です",
-        "nameTooLong": "サブエージェント名は {count} 文字以内にしてください",
-        "nameInvalid": "サブエージェント名には小文字、数字、ハイフン、アンダースコアのみ使用できます",
-        "nicknameInvalid": "ニックネーム候補には ASCII 文字、数字、スペース、ハイフン、アンダースコアのみ使用できます",
-        "nicknameDuplicate": "ニックネーム候補は一意である必要があります"
+      "commands": {
+        "title": "Claude Code コマンド",
+        "hint": "コマンドは Claude Code でのみ動作します。スキルへの変換をおすすめします。",
+        "badge": "コマンド",
+        "empty": ".claude/commands にコマンドはありません。",
+        "convert": "スキルに変換",
+        "editTitle": "コマンドを編集",
+        "convertTitle": "コマンドをスキルに変換",
+        "nameDesc": ".claude/commands 内のパス(.md なし)。入れ子のコマンドは / を使います",
+        "descriptionDesc": "コマンドメニューに表示される任意の説明",
+        "updated": "コマンド「{name}」を更新しました。",
+        "converted": "コマンドをスキル「{name}」に変換しました。",
+        "deleted": "コマンド「{name}」をゴミ箱に移動しました。",
+        "deleteTitle": "コマンドを削除",
+        "deleteDescription": "コマンドファイルはゴミ箱に移動されます。",
+        "collisionFailed": "「{name}」という名前のコマンドはすでに存在します。"
       },
-      "header": "Codex サブエージェント",
-      "noAgents": "Vault に Codex サブエージェントがありません。+ をクリックして作成してください。"
+      "droppedFrontmatterWarning": "保存すると名前と説明だけが残ります。次のキーは削除され、プロバイダーの動作が変わる可能性があります: {keys}",
+      "hidden": {
+        "name": "非表示のコマンドとスキル",
+        "desc": "すべてのプロバイダーのコマンドメニューからコマンドとスキルを非表示にします。先頭のスラッシュを付けずに正確な名前を 1 行に 1 つずつ入力してください(Pi のスキルは skill:名前)。",
+        "placeholder": "commit\ncompact\nskill:review"
+      },
+      "sync": {
+        "title": "スキルを同期",
+        "repairTitle": "スキルのリンクを修復",
+        "loading": "スキルフォルダーを確認しています...",
+        "intro": "同期すると、Claude Code のスキルとコマンドを .agents/skills にまとめ、.claude/skills をそこへのリンクにします。",
+        "pros": {
+          "oneList": "すべてのプロバイダーで 1 つのリスト。",
+          "newSkills": "新しいスキルはどこでも使えます。"
+        },
+        "cons": {
+          "dropped": "名前と説明だけが残ります。プロバイダー固有の設定は削除され、動作が変わる可能性があります。",
+          "claudeSyntax": "Claude Code 専用の構文は他のプロバイダーでは動作しません: {names}"
+        },
+        "attentionTitle": "確認が必要",
+        "nothingNeedsAttention": "確認が必要な項目はありません。",
+        "nameField": "名前",
+        "descriptionField": "説明",
+        "ready": "準備完了",
+        "problems": {
+          "name": "無効な名前です。小文字、数字、ハイフンを使ってください。",
+          "description": "説明がありません。",
+          "instructions": "指示がありません。ファイルに追加してから再度同期してください。",
+          "unreadable": "フロントマターを読み取れません。ファイルを修正してから再度同期してください。",
+          "sharedConflict": "「{name}」という共有スキルはすでに存在します。",
+          "itemConflict": "別の項目も「{name}」という名前です。"
+        },
+        "options": {
+          "fix": "修正",
+          "replace": "共有スキルを置き換える",
+          "discard": "破棄(ゴミ箱へ移動)",
+          "keep": "コマンドのまま残す"
+        },
+        "continue": "続行",
+        "confirmTitle": ".claude/skills をリンクに置き換えますか?",
+        "confirmBody": ".claude/skills は .agents/skills へのリンクに置き換えられます。この操作は元に戻せません。",
+        "repairBody": ".claude/skills は .agents/skills へのリンクに置き換えられます。現在のリンク先のフォルダーは変更されません。",
+        "linkBody": ".claude/skills を .agents/skills へのリンクとして作成し、Claude Code が共有スキルを使えるようにします。ファイルは移動しません。",
+        "linkWithItemsBody": "コマンドがスキルになり、その後 .claude/skills が .agents/skills へのリンクとして作成されます。この操作は元に戻せません。",
+        "devicesWarning": "この保管庫を複数のデバイスで同期していますか? リンクは同期されない可能性があるため、各デバイスで同期してください。",
+        "confirm": "同期してリンク",
+        "partial": "リンクの作成前に同期が停止しました。以下の項目を修正して、もう一度同期してください。",
+        "failed": "同期に失敗しました: {message}",
+        "summary": "移動 {moved}、変換 {converted}、ゴミ箱 {trashed}、リンク削除 {unlinked}。"
+      }
     }
   }
 }

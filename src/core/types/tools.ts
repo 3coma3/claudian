@@ -46,6 +46,8 @@ export interface ToolCallInfo {
   isExpanded?: boolean;
   diffData?: ToolDiffData;
   resolvedAnswers?: AskUserAnswers;
+  /** Live async question presentation; replay alone never opens a prompt. */
+  questionStatus?: 'pending' | 'expired';
   subagent?: SubagentInfo;
 }
 
@@ -62,6 +64,8 @@ export type AsyncSubagentStatus =
 
 /** Subagent (Agent tool) tracking for sync and async modes. */
 export interface SubagentInfo {
+  /** Session events own this state independently of the parent tool result. */
+  lifecycleSource?: 'session';
   id: string;
   description: string;
   prompt?: string;
@@ -75,4 +79,16 @@ export interface SubagentInfo {
   outputToolId?: string;
   startedAt?: number;
   completedAt?: number;
+}
+
+/** Display-only snapshot of a running subagent; newer snapshots replace older ones and none is persisted. */
+export interface SubagentProgress {
+  /** Tool call that spawned the subagent. */
+  toolCallId: string;
+  /** One-line description of what the subagent is doing now. */
+  summary?: string;
+  lastToolName?: string;
+  toolUses?: number;
+  totalTokens?: number;
+  durationMs?: number;
 }

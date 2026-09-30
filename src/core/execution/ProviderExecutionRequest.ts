@@ -38,7 +38,8 @@ export type ProviderSystemInstructions =
 export interface ProviderExecutionConfiguration {
   readonly systemInstructions: ProviderSystemInstructions;
   readonly model?: string;
-  readonly reasoning?: string;
+  /** Explicit choices cannot be replaced by saved defaults. Null omits the native override; undefined permits auxiliary defaults. */
+  readonly reasoning?: string | null;
   readonly permissionMode?: string;
   readonly serviceTier?: string;
 }

@@ -1,39 +1,13 @@
-/* Context usage meter (inline in toolbar) */
+/* Context usage meter, in the toolbar right after the model picker */
 
 .claudian-context-meter {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-inline-start: 8px;
+  /* With the icon's 4px inset in its 24px gauge, 6px separates it from the number. */
+  gap: 2px;
+  margin-inline-start: 0;
   cursor: default;
-}
-
-/* Custom tooltip */
-.claudian-context-meter::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  color: var(--text-normal);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-  pointer-events: none;
-  z-index: 100;
-}
-
-.claudian-context-meter:hover::after {
-  opacity: 1;
-  visibility: visible;
 }
 
 .claudian-context-meter-gauge {
@@ -60,9 +34,10 @@
 
 .claudian-context-meter-percent {
   font-size: 11px;
-  color: var(--claudian-brand);
+  color: var(--text-muted);
   min-width: 24px;
-  text-align: end;
+  /* Room for longer numbers stays after the number, away from the icon. */
+  text-align: start;
   transition: color 0.3s ease;
 }
 

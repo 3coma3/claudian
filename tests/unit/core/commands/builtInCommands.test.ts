@@ -1,13 +1,20 @@
-import '@/providers';
-
 import {
   BUILT_IN_COMMANDS,
   detectBuiltInCommand,
   getBuiltInCommandsForDropdown,
   isBuiltInCommandSupported,
-} from '../../../../src/core/commands/builtInCommands';
+} from '@/core/commands/builtInCommands';
 
 describe('builtInCommands', () => {
+  it('uses fast-mode capability rather than a provider name for detection and display', () => {
+    const capable = { providerId: 'test-provider', supportsFastMode: true };
+    const incapable = { providerId: 'codex', supportsFastMode: false };
+    expect(detectBuiltInCommand('/fast', capable)?.command.action).toBe('fast');
+    expect(getBuiltInCommandsForDropdown(capable).map(command => command.name)).toContain('fast');
+    expect(detectBuiltInCommand('/fast', incapable)).toBeNull();
+    expect(getBuiltInCommandsForDropdown(incapable).map(command => command.name)).not.toContain('fast');
+  });
+
   describe('detectBuiltInCommand', () => {
     it('detects /clear command', () => {
       const result = detectBuiltInCommand('/clear');
@@ -92,21 +99,9 @@ describe('builtInCommands', () => {
       expect(result?.args).toBe('');
     });
 
-    it('leaves provider-restricted commands to other providers', () => {
+    it('leaves unsupported commands to provider handling', () => {
       expect(detectBuiltInCommand('/fast', 'claude')).toBeNull();
-      expect(detectBuiltInCommand('/fast', 'codex')?.command.action).toBe('fast');
-    });
-
-    it('detects only the exact argument-free instruction command', () => {
-      expect(detectBuiltInCommand('/instruction', {
-        supportsInstructionMode: true,
-      })?.command.action).toBe('instruction');
-      expect(detectBuiltInCommand('/instruction remember this', {
-        supportsInstructionMode: true,
-      })).toBeNull();
-      expect(detectBuiltInCommand('/instruction', {
-        supportsInstructionMode: false,
-      })).toBeNull();
+      expect(detectBuiltInCommand('/fast', { supportsFastMode: true })?.command.action).toBe('fast');
     });
   });
 
@@ -123,97 +118,6 @@ describe('builtInCommands', () => {
       expect(clearCmd?.content).toBe('');
     });
 
-    it('returns commands compatible with SlashCommand interface', () => {
-      const commands = getBuiltInCommandsForDropdown();
-
-      for (const cmd of commands) {
-        expect(cmd).toHaveProperty('id');
-        expect(cmd).toHaveProperty('name');
-        expect(cmd).toHaveProperty('description');
-        expect(cmd).toHaveProperty('content');
-      }
-    });
-  });
-
-  describe('BUILT_IN_COMMANDS', () => {
-    it('has clear command with new alias', () => {
-      const clearCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'clear');
-      expect(clearCmd).toBeDefined();
-      expect(clearCmd?.aliases).toContain('new');
-      expect(clearCmd?.action).toBe('clear');
-    });
-
-    it('has resume command', () => {
-      const resumeCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'resume');
-      expect(resumeCmd).toBeDefined();
-      expect(resumeCmd?.action).toBe('resume');
-      expect(resumeCmd?.description).toBe('Resume a previous conversation');
-    });
-
-    it('has fork command', () => {
-      const forkCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'fork');
-      expect(forkCmd).toBeDefined();
-      expect(forkCmd?.action).toBe('fork');
-    });
-
-    it('has a Codex-only fast command', () => {
-      const fastCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'fast');
-      expect(fastCmd).toBeDefined();
-      expect(fastCmd?.action).toBe('fast');
-      expect(fastCmd?.supportedProviderIds).toEqual(['codex']);
-    });
-
-    it('clear has no provider restriction', () => {
-      const clearCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'clear');
-      expect(clearCmd?.requiredCapability).toBeUndefined();
-    });
-
-    it('resume requires native history support', () => {
-      const cmd = BUILT_IN_COMMANDS.find((c) => c.name === 'resume');
-      expect(cmd?.requiredCapability).toBe('supportsNativeHistory');
-    });
-
-    it('fork requires fork support', () => {
-      const cmd = BUILT_IN_COMMANDS.find((c) => c.name === 'fork');
-      expect(cmd?.requiredCapability).toBe('supportsFork');
-    });
-  });
-
-  describe('getBuiltInCommandsForDropdown - provider filtering', () => {
-    it('returns all commands when no providerId is given', () => {
-      const commands = getBuiltInCommandsForDropdown();
-      expect(commands.length).toBe(BUILT_IN_COMMANDS.length);
-    });
-
-    it('excludes Codex-only commands for the Claude provider', () => {
-      const commands = getBuiltInCommandsForDropdown('claude');
-      expect(commands.length).toBe(BUILT_IN_COMMANDS.length - 1);
-      expect(commands.map(c => c.name)).toContain('clear');
-      expect(commands.map(c => c.name)).toContain('resume');
-      expect(commands.map(c => c.name)).toContain('fork');
-      expect(commands.map(c => c.name)).not.toContain('fast');
-    });
-
-    it('returns all capability-supported commands for codex provider', () => {
-      const commands = getBuiltInCommandsForDropdown('codex');
-      const names = commands.map(c => c.name);
-      expect(names).toContain('clear');
-      expect(names).toContain('resume');
-      expect(names).toContain('fork');
-      expect(names).toContain('fast');
-    });
-
-    it('returns only commands supported by codex capabilities', () => {
-      const commands = getBuiltInCommandsForDropdown('codex');
-      expect(commands.length).toBe(5);
-      expect(commands.map(c => c.name)).toEqual([
-        'clear',
-        'resume',
-        'fork',
-        'fast',
-        'instruction',
-      ]);
-    });
   });
 
   describe('isBuiltInCommandSupported', () => {
@@ -225,7 +129,7 @@ describe('builtInCommands', () => {
 
     it('returns false for provider-restricted commands on other providers', () => {
       const resumeCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'resume')!;
-      expect(isBuiltInCommandSupported(resumeCmd, 'claude')).toBe(true);
+      expect(isBuiltInCommandSupported(resumeCmd, { supportsNativeHistory: true })).toBe(true);
       expect(isBuiltInCommandSupported(
         resumeCmd,
         { supportsNativeHistory: false, supportsFork: true },
@@ -244,12 +148,13 @@ describe('builtInCommands', () => {
       )).toBe(false);
     });
 
-    it('enforces explicit provider restrictions', () => {
+    it('requires an explicit fast capability', () => {
       const fastCmd = BUILT_IN_COMMANDS.find((c) => c.name === 'fast')!;
-      expect(isBuiltInCommandSupported(fastCmd, 'codex')).toBe(true);
+      expect(isBuiltInCommandSupported(fastCmd, { supportsFastMode: true })).toBe(true);
       expect(isBuiltInCommandSupported(fastCmd, 'claude')).toBe(false);
       expect(isBuiltInCommandSupported(fastCmd, {
         providerId: 'codex',
+        supportsFastMode: true,
         supportsNativeHistory: true,
         supportsFork: true,
       })).toBe(true);

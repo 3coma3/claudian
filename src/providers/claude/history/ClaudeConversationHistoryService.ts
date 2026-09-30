@@ -1,19 +1,27 @@
+import { copyProviderHistoryState } from '@/core/providers/providerHistory';
+import { mapWithConcurrency } from '@/utils/concurrency';
+
 import { encodeProviderModelSelectionId } from '../../../core/providers/modelSelection';
 import type {
   ProviderConversationHistoryService,
   ProviderConversationSessionAvailability,
+  ProviderHistoryInput,
   ProviderHistoryPathContext,
+  ProviderHistoryResult,
+  ProviderHistoryState,
+  ProviderHistoryUpdate,
 } from '../../../core/providers/types';
 import { TOOL_SUBAGENT } from '../../../core/tools/toolNames';
+import { omitToolResultImageData } from '../../../core/tools/toolResultContent';
 import type {
   AsyncSubagentStatus,
   ChatMessage,
-  Conversation,
   ForkSource,
   ImageAttachment,
   SubagentInfo,
   ToolCallInfo,
 } from '../../../core/types';
+import { extractHandbackResult } from '../normalization/claudeSubagentResult';
 import { isClaudeSubagentToolName } from '../subagentToolNames';
 import {
   type ClaudeProviderState,
@@ -28,7 +36,6 @@ import {
   loadSubagentToolCalls,
   locateSDKSession,
   locateSDKSessions,
-  readLegacyConversationSessionId,
   recoverSDKSessionIdByTime,
 } from './ClaudeHistoryStore';
 import type { SDKSessionLocation } from './sdkSessionPaths';
@@ -77,11 +84,15 @@ function mergeSubagentInfo(
 ): SubagentInfo {
   const sdkSubagent = taskToolCall.subagent;
   const cachedAsyncStatus = normalizeAsyncStatus(cachedSubagent);
+  const isSync = sdkSubagent?.mode === 'sync' || cachedSubagent.mode === 'sync'
+    || taskToolCall.input.run_in_background === false;
+  const result = isSync ? (taskToolCall.result ?? cachedSubagent.result)
+    : chooseRicherResult(taskToolCall.result, cachedSubagent.result);
   if (!sdkSubagent) {
     return {
       ...cachedSubagent,
       asyncStatus: cachedAsyncStatus,
-      result: chooseRicherResult(taskToolCall.result, cachedSubagent.result),
+      result,
     };
   }
 
@@ -95,7 +106,7 @@ function mergeSubagentInfo(
   const mergedMode = sdkSubagent.mode
     ?? cachedSubagent.mode
     ?? (taskToolCall.input?.run_in_background === true ? 'async' : undefined);
-  const fallbackResult = chooseRicherResult(sdkResult, cachedSubagent.result);
+  const fallbackResult = isSync ? result : chooseRicherResult(sdkResult, cachedSubagent.result);
   const mergedResult = preferred === cachedSubagent
     ? (cachedSubagent.result ?? fallbackResult)
     : fallbackResult;
@@ -124,6 +135,9 @@ function ensureTaskToolCall(
   subagentId: string,
   subagent: SubagentInfo,
 ): ToolCallInfo {
+  if (subagent.mode !== 'async' && subagent.result !== undefined) {
+    subagent = { ...subagent, result: extractHandbackResult(subagent.result) ?? subagent.result };
+  }
   msg.toolCalls = msg.toolCalls || [];
   let taskToolCall = msg.toolCalls.find(
     tc => tc.id === subagentId && isClaudeSubagentToolName(tc.name),
@@ -208,8 +222,36 @@ function mergeImageAttachments(
   return merged;
 }
 
+/** Cached snapshots may predate native result normalization, including while offline. */
+function normalizeCachedSyncResults(messages: ChatMessage[]): void {
+  for (const message of messages) {
+    for (const tool of message.toolCalls ?? []) {
+      if (!isClaudeSubagentToolName(tool.name) || tool.input.run_in_background === true
+        || tool.subagent?.mode === 'async') continue;
+      if (tool.result !== undefined) tool.result = extractHandbackResult(tool.result) ?? tool.result;
+      if (tool.subagent?.result !== undefined) {
+        tool.subagent.result = extractHandbackResult(tool.subagent.result) ?? tool.subagent.result;
+      }
+    }
+  }
+}
+
 function mergeDuplicateMessage(target: ChatMessage, incoming: ChatMessage): void {
   target.images = mergeImageAttachments(target.images, incoming.images);
+  // Native sync results have structured metadata unavailable in old cached snapshots.
+  for (const nativeTool of incoming.toolCalls ?? []) {
+    if (!isClaudeSubagentToolName(nativeTool.name) || nativeTool.input.run_in_background === true
+      || nativeTool.subagent?.mode === 'async' || nativeTool.result === undefined) continue;
+    const cachedTool = target.toolCalls?.find(tool => tool.id === nativeTool.id);
+    if (!cachedTool || cachedTool.input.run_in_background === true
+      || cachedTool.subagent?.mode === 'async' || normalizeAsyncStatus(cachedTool.subagent) !== undefined) continue;
+    cachedTool.result = nativeTool.result;
+    cachedTool.status = nativeTool.status;
+    if (cachedTool.subagent) {
+      cachedTool.subagent.result = nativeTool.result;
+      cachedTool.subagent.status = nativeTool.status === 'error' ? 'error' : nativeTool.status === 'running' ? 'running' : 'completed';
+    }
+  }
 }
 
 function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
@@ -230,6 +272,48 @@ function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
   return result;
 }
 
+/** Native transcript order wins; cached-only messages keep their surrounding anchors. */
+function mergeHistoryMessages(cached: ChatMessage[], native: ChatMessage[]): ChatMessage[] {
+  const byId = new Map(dedupeMessages([...cached, ...native]).map(message => [message.id, message]));
+  const nativeIds = new Set(native.map(message => message.id));
+  const nextAnchors = new Map<string, string>();
+  let nextAnchor: string | undefined;
+  for (const message of [...cached].reverse()) {
+    if (nativeIds.has(message.id)) nextAnchor = message.id;
+    else if (nextAnchor) nextAnchors.set(message.id, nextAnchor);
+  }
+  const emitted = new Set<string>();
+  const result: ChatMessage[] = [];
+  const append = (message: ChatMessage) => {
+    if (emitted.has(message.id)) return;
+    emitted.add(message.id);
+    result.push(byId.get(message.id)!);
+  };
+  let cursor = 0;
+  for (const message of native) {
+    while (cursor < cached.length) {
+      const candidate = cached[cursor];
+      if (candidate.id === message.id) {
+        cursor++;
+        break;
+      }
+      if (emitted.has(candidate.id)) {
+        cursor++;
+        continue;
+      }
+      // A shared message anchors later cache entries; timestamps only place
+      // entries absent from native history, never reorder native messages.
+      if (nativeIds.has(candidate.id)
+        || (nextAnchors.get(candidate.id) !== message.id && candidate.timestamp > message.timestamp)) break;
+      append(candidate);
+      cursor++;
+    }
+    append(message);
+  }
+  for (; cursor < cached.length; cursor++) append(cached[cursor]);
+  return result;
+}
+
 async function enrichAsyncSubagentToolCalls(
   subagentData: Record<string, SubagentInfo>,
   vaultPath: string,
@@ -241,47 +325,37 @@ async function enrichAsyncSubagentToolCalls(
   if (uniqueSessionIds.length === 0) return;
 
   const loaderCache = new Map<string, ReturnType<typeof loadSubagentToolCalls>>();
+  const load = (sessionId: string, agentId: string): ReturnType<typeof loadSubagentToolCalls> => {
+    const cacheKey = `${sessionId}:${agentId}`;
+    let loader = loaderCache.get(cacheKey);
+    if (!loader) {
+      loader = loadSubagentToolCalls(
+        vaultPath,
+        sessionId,
+        agentId,
+        relocatedSessionPaths.get(sessionId),
+        pathContext,
+      );
+      loaderCache.set(cacheKey, loader);
+    }
+    return loader;
+  };
 
-  for (const subagent of Object.values(subagentData)) {
-    if (subagent.mode !== 'async') continue;
-    if (!subagent.agentId) continue;
-    if ((subagent.toolCalls?.length ?? 0) > 0) continue;
+  await Promise.all(Object.values(subagentData).map(async (subagent) => {
+    if (subagent.mode !== 'async' || !subagent.agentId || (subagent.toolCalls?.length ?? 0) > 0) return;
 
+    // Segments are searched in order; later segments load only if earlier ones have no sidecar.
     for (const sessionId of uniqueSessionIds) {
-      const cacheKey = `${sessionId}:${subagent.agentId}`;
-
-      let loader = loaderCache.get(cacheKey);
-      if (!loader) {
-        const relocatedSessionPath = relocatedSessionPaths.get(sessionId);
-        if (pathContext) {
-          loader = loadSubagentToolCalls(
-            vaultPath,
-            sessionId,
-            subagent.agentId,
-            relocatedSessionPath,
-            pathContext,
-          );
-        } else {
-          loader = loadSubagentToolCalls(
-            vaultPath,
-            sessionId,
-            subagent.agentId,
-            relocatedSessionPath,
-          );
-        }
-        loaderCache.set(cacheKey, loader);
-      }
-
-      const recoveredToolCalls = await loader;
+      const recoveredToolCalls = await load(sessionId, subagent.agentId);
       if (recoveredToolCalls.length === 0) continue;
 
       subagent.toolCalls = recoveredToolCalls.map(toolCall => ({
         ...toolCall,
         input: { ...toolCall.input },
       }));
-      break;
+      return;
     }
-  }
+  }));
 }
 
 function applySubagentData(
@@ -289,11 +363,12 @@ function applySubagentData(
   subagentData: Record<string, SubagentInfo>,
 ): void {
   const attachedSubagentIds = new Set<string>();
+  const subagentEntries = Object.entries(subagentData);
 
   for (const msg of messages) {
     if (msg.role !== 'assistant') continue;
 
-    for (const [subagentId, subagent] of Object.entries(subagentData)) {
+    for (const [subagentId, subagent] of subagentEntries) {
       const hasSubagentBlock = msg.contentBlocks?.some(
         block => (block.type === 'subagent' && block.subagentId === subagentId)
           || (block.type === 'tool_use' && block.toolId === subagentId),
@@ -337,7 +412,7 @@ function applySubagentData(
     }
   }
 
-  for (const [subagentId, subagent] of Object.entries(subagentData)) {
+  for (const [subagentId, subagent] of subagentEntries) {
     if (attachedSubagentIds.has(subagentId)) continue;
 
     let anchor = [...messages].reverse().find((msg): msg is ChatMessage => msg.role === 'assistant');
@@ -368,6 +443,35 @@ function applySubagentData(
   }
 }
 
+function stripResultImageData(result: string | undefined): string | undefined {
+  if (!result?.includes('"base64"')) return result;
+
+  try {
+    let changed = false;
+    const content: unknown = JSON.parse(result, (key, value: unknown) => {
+      const next = omitToolResultImageData(key, value);
+      if (next !== value) changed = true;
+      return next;
+    });
+    return changed ? JSON.stringify(content) : result;
+  } catch {
+    return result;
+  }
+}
+
+function buildPersistedSubagent(subagent: SubagentInfo): SubagentInfo {
+  // Metadata written before results omitted image payloads still carries them; repair on save.
+  return {
+    ...subagent,
+    result: stripResultImageData(subagent.result),
+    toolCalls: subagent.toolCalls.map(toolCall => ({
+      ...toolCall,
+      result: stripResultImageData(toolCall.result),
+      ...(toolCall.subagent ? { subagent: buildPersistedSubagent(toolCall.subagent) } : {}),
+    })),
+  };
+}
+
 function buildPersistedSubagentData(messages: ChatMessage[]): Record<string, SubagentInfo> {
   const result: Record<string, SubagentInfo> = {};
 
@@ -383,6 +487,22 @@ function buildPersistedSubagentData(messages: ChatMessage[]): Record<string, Sub
   return result;
 }
 
+/**
+ * The repository hands every history call its own copy of the conversation, so session lookups
+ * are shared by the state that determines them. Entries expire so that bulk model recovery does
+ * not retain them and moved transcripts are eventually rediscovered.
+ */
+const SESSION_LOCATION_TTL_MS = 30_000;
+const MAX_SESSION_LOCATION_CACHES = 16;
+
+interface SessionLocationCache {
+  /** Availability probes handed to the next history read, which consumes them. */
+  pending: Map<string, SDKSessionLocation>;
+  /** Relocated segment paths reused by later reads of the same history. */
+  relocated: Map<string, string>;
+  expiresAt: number;
+}
+
 function sanitizeProviderState(
   providerState: ClaudeProviderState,
 ): Record<string, unknown> | undefined {
@@ -395,42 +515,43 @@ function sanitizeProviderState(
 }
 
 export class ClaudeConversationHistoryService implements ProviderConversationHistoryService {
-  private hydratedConversationIds = new Set<string>();
-  private historyCacheKeysByConversation = new Map<string, string>();
-  private pendingSessionLocationsByConversation = new Map<
-    string,
-    Map<string, SDKSessionLocation>
-  >();
-  private relocatedSessionPathsByConversation = new Map<string, Map<string, string>>();
+  readonly #sessionLocationCaches = new Map<string, SessionLocationCache>();
 
-  private getConversationSessionIds(conversation: Conversation): string[] {
+  #getConversationSessionIds(conversation: ProviderHistoryInput): string[] {
     return getClaudeConversationSessionIds(conversation);
   }
 
-  private synchronizeHistoryCache(
-    conversation: Conversation,
+  #getSessionLocationCache(
+    conversation: ProviderHistoryInput,
     vaultPath: string,
     pathContext?: ProviderHistoryPathContext,
-  ): void {
+  ): SessionLocationCache {
     const state = getClaudeState(conversation.providerState);
     const cacheKey = JSON.stringify([
       getSDKProjectsPath(pathContext),
       encodeVaultPathForSDK(vaultPath),
-      this.getConversationSessionIds(conversation),
+      this.#getConversationSessionIds(conversation),
       conversation.resumeAtMessageId ?? null,
       state.forkSource?.resumeAt ?? null,
     ]);
-    const previousKey = this.historyCacheKeysByConversation.get(conversation.id);
-    if (previousKey !== undefined && previousKey !== cacheKey) {
-      this.hydratedConversationIds.delete(conversation.id);
-      this.pendingSessionLocationsByConversation.delete(conversation.id);
-      this.relocatedSessionPathsByConversation.delete(conversation.id);
+    const now = Date.now();
+    for (const [key, entry] of this.#sessionLocationCaches) {
+      if (entry.expiresAt <= now) this.#sessionLocationCaches.delete(key);
     }
-    this.historyCacheKeysByConversation.set(conversation.id, cacheKey);
+    const cache = this.#sessionLocationCaches.get(cacheKey)
+      ?? { pending: new Map(), relocated: new Map(), expiresAt: 0 };
+    cache.expiresAt = now + SESSION_LOCATION_TTL_MS;
+    this.#sessionLocationCaches.delete(cacheKey);
+    this.#sessionLocationCaches.set(cacheKey, cache);
+    for (const oldest of this.#sessionLocationCaches.keys()) {
+      if (this.#sessionLocationCaches.size <= MAX_SESSION_LOCATION_CACHES) break;
+      this.#sessionLocationCaches.delete(oldest);
+    }
+    return cache;
   }
 
   async getConversationSessionAvailability(
-    conversation: Conversation,
+    conversation: ProviderHistoryInput,
     vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
   ): Promise<ProviderConversationSessionAvailability> {
@@ -438,57 +559,36 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     if (!vaultPath) {
       return 'unknown';
     }
-    this.synchronizeHistoryCache(conversation, vaultPath, pathContext);
     if (!sessionId) return 'unknown';
 
-    const location = await (pathContext
-      ? locateSDKSession(vaultPath, sessionId, pathContext)
-      : locateSDKSession(vaultPath, sessionId));
-    this.pendingSessionLocationsByConversation.set(
-      conversation.id,
-      new Map([[sessionId, location]]),
-    );
+    const location = await locateSDKSession(vaultPath, sessionId, pathContext);
+    const cache = this.#getSessionLocationCache(conversation, vaultPath, pathContext);
+    cache.pending = new Map([[sessionId, location]]);
     if (location.availability === 'relocated' && location.sessionPath) {
-      const relocatedSessionPaths = new Map(
-        this.relocatedSessionPathsByConversation.get(conversation.id) ?? [],
-      );
-      relocatedSessionPaths.set(sessionId, location.sessionPath);
-      this.relocatedSessionPathsByConversation.set(
-        conversation.id,
-        relocatedSessionPaths,
-      );
+      cache.relocated.set(sessionId, location.sessionPath);
     } else if (location.availability !== 'unknown') {
-      const relocatedSessionPaths = new Map(
-        this.relocatedSessionPathsByConversation.get(conversation.id) ?? [],
-      );
-      relocatedSessionPaths.delete(sessionId);
-      if (relocatedSessionPaths.size > 0) {
-        this.relocatedSessionPathsByConversation.set(
-          conversation.id,
-          relocatedSessionPaths,
-        );
-      } else {
-        this.relocatedSessionPathsByConversation.delete(conversation.id);
-      }
+      cache.relocated.delete(sessionId);
     }
     return location.availability;
   }
 
   async prepareRelocatedConversationSession(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
-  ): Promise<boolean> {
+  ): Promise<ProviderHistoryUpdate | null> {
+    const conversation = copyProviderHistoryState(input);
     const sessionId = this.resolveSessionIdForConversation(conversation);
     if (!vaultPath || !sessionId) {
-      return false;
+      return null;
     }
 
-    await this.hydrateConversationHistory(conversation, vaultPath, pathContext);
-    if (!this.hydratedConversationIds.has(conversation.id)) {
-      return false;
+    const hydration = await this.#readHistory(input, vaultPath, pathContext);
+    if (!hydration.complete) {
+      return null;
     }
 
+    Object.assign(conversation, hydration.changes);
     const state = { ...getClaudeState(conversation.providerState) };
     state.previousProviderSessionIds = [
       ...new Set([...(state.previousProviderSessionIds || []), sessionId]),
@@ -502,15 +602,16 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
 
     conversation.sessionId = null;
     conversation.providerState = sanitizeProviderState(state);
-    return true;
+    return conversation;
   }
 
   async resolveMissingConversationSession(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     vaultPath: string | null,
     missingProviderSessionId?: string,
     pathContext?: ProviderHistoryPathContext,
-  ): Promise<'delete' | 'reset' | 'preserve'> {
+  ): Promise<ProviderHistoryResult<'delete' | 'reset' | 'preserve'>> {
+    const conversation = copyProviderHistoryState(input);
     const currentSessionId = this.resolveSessionIdForConversation(conversation);
     if (
       !vaultPath
@@ -518,23 +619,19 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
       || (missingProviderSessionId
         && missingProviderSessionId.toLowerCase() !== currentSessionId.toLowerCase())
     ) {
-      return 'preserve';
+      return { outcome: 'preserve' };
     }
 
-    this.synchronizeHistoryCache(conversation, vaultPath, pathContext);
-
-    const sessionIds = this.getConversationSessionIds(conversation);
-    const locations = await (pathContext
-      ? locateSDKSessions(vaultPath, sessionIds, pathContext)
-      : locateSDKSessions(vaultPath, sessionIds));
+    const sessionIds = this.#getConversationSessionIds(conversation);
+    const locations = await locateSDKSessions(vaultPath, sessionIds, pathContext);
+    const cache = this.#getSessionLocationCache(input, vaultPath, pathContext);
     const preservedSessionIds = sessionIds.filter(
       sessionId => locations.get(sessionId)?.availability !== 'missing',
     );
     if (preservedSessionIds.length === 0) {
-      this.pendingSessionLocationsByConversation.delete(conversation.id);
-      this.relocatedSessionPathsByConversation.delete(conversation.id);
-      this.hydratedConversationIds.delete(conversation.id);
-      return 'delete';
+      cache.pending.clear();
+      cache.relocated.clear();
+      return { outcome: 'delete' };
     }
 
     const state = { ...getClaudeState(conversation.providerState) };
@@ -547,19 +644,18 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
 
     conversation.sessionId = null;
     conversation.providerState = sanitizeProviderState(state);
-    this.pendingSessionLocationsByConversation.delete(conversation.id);
-    this.hydratedConversationIds.delete(conversation.id);
-    return 'reset';
+    cache.pending.clear();
+    return { outcome: 'reset', changes: conversation };
   }
 
-  isPendingForkConversation(conversation: Conversation): boolean {
+  isPendingForkConversation(conversation: ProviderHistoryInput): boolean {
     const state = getClaudeState(conversation.providerState);
     return !!state.forkSource
       && !state.providerSessionId
       && !conversation.sessionId;
   }
 
-  resolveSessionIdForConversation(conversation: Conversation | null): string | null {
+  resolveSessionIdForConversation(conversation: ProviderHistoryInput | null): string | null {
     if (!conversation) return null;
     const state = getClaudeState(conversation.providerState);
     return state.providerSessionId ?? conversation.sessionId ?? state.forkSource?.sessionId ?? null;
@@ -577,15 +673,20 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
   }
 
   buildPersistedProviderState(
-    conversation: Conversation,
+    conversation: ProviderHistoryInput,
+    options: { preserveProviderState?: boolean } = {},
   ): Record<string, unknown> | undefined {
     const providerState: ClaudeProviderState = {
       ...getClaudeState(conversation.providerState),
     };
 
-    const subagentData = buildPersistedSubagentData(conversation.messages);
+    const subagentData = options.preserveProviderState
+      ? providerState.subagentData ?? {}
+      : buildPersistedSubagentData(conversation.messages);
     if (Object.keys(subagentData).length > 0) {
-      providerState.subagentData = subagentData;
+      providerState.subagentData = Object.fromEntries(
+        Object.entries(subagentData).map(([id, subagent]) => [id, buildPersistedSubagent(subagent)]),
+      );
     } else {
       delete providerState.subagentData;
     }
@@ -594,63 +695,57 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
   }
 
   async recoverConversationSessionReference(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
-  ): Promise<boolean> {
-    if (!vaultPath || this.resolveSessionIdForConversation(conversation)) {
-      return false;
-    }
-
-    const legacySessionId = await readLegacyConversationSessionId(
-      vaultPath,
-      conversation.id,
-    );
-    if (legacySessionId) {
-      conversation.providerState = sanitizeProviderState({
-        ...getClaudeState(conversation.providerState),
-        previousProviderSessionIds: [legacySessionId],
-      });
-      return true;
+  ): Promise<ProviderHistoryUpdate | null> {
+    const conversation = copyProviderHistoryState(input);
+    if (input.createdAt === undefined || input.lastActivityAt === undefined || !vaultPath || this.resolveSessionIdForConversation(conversation)) {
+      return null;
     }
 
     const fingerprint = {
-      createdAt: conversation.createdAt,
-      lastActivityAt: conversation.lastActivityAt,
+      createdAt: input.createdAt,
+      lastActivityAt: input.lastActivityAt,
     };
-    const recoveredSessionId = pathContext
-      ? await recoverSDKSessionIdByTime(vaultPath, fingerprint, pathContext)
-      : await recoverSDKSessionIdByTime(vaultPath, fingerprint);
-    if (!recoveredSessionId) return false;
+    const recoveredSessionId = await recoverSDKSessionIdByTime(vaultPath, fingerprint, pathContext);
+    if (!recoveredSessionId) return null;
 
     conversation.sessionId = recoveredSessionId;
     conversation.providerState = sanitizeProviderState({
       ...getClaudeState(conversation.providerState),
       providerSessionId: recoveredSessionId,
     });
-    return true;
+    return conversation;
   }
 
   async hydrateConversationHistory(
-    conversation: Conversation,
+    input: ProviderHistoryInput,
     vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
-  ): Promise<void> {
+  ): Promise<ProviderHistoryUpdate> {
+    return (await this.#readHistory(input, vaultPath, pathContext)).changes;
+  }
+
+  async #readHistory(
+    input: ProviderHistoryInput,
+    vaultPath: string | null,
+    pathContext?: ProviderHistoryPathContext,
+  ): Promise<{ changes: ProviderHistoryState; complete: boolean }> {
+    const conversation = copyProviderHistoryState(input);
+    normalizeCachedSyncResults(conversation.messages);
     if (!vaultPath) {
-      return;
+      return { changes: conversation, complete: false };
     }
 
-    await this.recoverConversationSessionReference(conversation, vaultPath, pathContext);
-    const allSessionIds = this.getConversationSessionIds(conversation);
-
-    this.synchronizeHistoryCache(conversation, vaultPath, pathContext);
-    if (this.hydratedConversationIds.has(conversation.id)) return;
+    Object.assign(conversation, await this.recoverConversationSessionReference(input, vaultPath, pathContext));
+    const allSessionIds = this.#getConversationSessionIds(conversation);
 
     const state = getClaudeState(conversation.providerState);
     const isPendingFork = this.isPendingForkConversation(conversation);
 
     if (allSessionIds.length === 0) {
-      return;
+      return { changes: conversation, complete: false };
     }
 
     const allSdkMessages: ChatMessage[] = [];
@@ -658,27 +753,20 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     let unknownSessionCount = 0;
     let errorCount = 0;
     let successCount = 0;
-    const relocatedSessionPaths = new Map(
-      this.relocatedSessionPathsByConversation.get(conversation.id) ?? [],
-    );
-    const cachedLocations = new Map(
-      this.pendingSessionLocationsByConversation.get(conversation.id) ?? [],
-    );
-    this.pendingSessionLocationsByConversation.delete(conversation.id);
+    const cache = this.#getSessionLocationCache(input, vaultPath, pathContext);
+    const relocatedSessionPaths = new Map(cache.relocated);
+    const cachedLocations = cache.pending;
+    cache.pending = new Map();
     const unresolvedSessionIds = allSessionIds.filter(
       id => !relocatedSessionPaths.has(id) && !cachedLocations.has(id),
     );
-    const locatedSessions = await (pathContext
-      ? locateSDKSessions(vaultPath, unresolvedSessionIds, pathContext)
-      : locateSDKSessions(vaultPath, unresolvedSessionIds));
+    const locatedSessions = await locateSDKSessions(vaultPath, unresolvedSessionIds, pathContext);
     const resolvedLocations = new Map([...cachedLocations, ...locatedSessions]);
     for (const [sessionId, location] of locatedSessions) {
       if (location.availability === 'relocated' && location.sessionPath) {
         relocatedSessionPaths.set(sessionId, location.sessionPath);
+        cache.relocated.set(sessionId, location.sessionPath);
       }
-    }
-    if (relocatedSessionPaths.size > 0) {
-      this.relocatedSessionPathsByConversation.set(conversation.id, relocatedSessionPaths);
     }
 
     const resumableSessionId = isPendingFork
@@ -687,7 +775,7 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     const checkpointSessionId = resumableSessionId
       ?? (conversation.resumeAtMessageId ? allSessionIds[allSessionIds.length - 1] : null);
 
-    for (const sessionId of allSessionIds) {
+    const loaded = await mapWithConcurrency(allSessionIds, async sessionId => {
       const relocatedSessionPath = relocatedSessionPaths.get(sessionId);
       const location = relocatedSessionPath
         ? { availability: 'relocated' as const, sessionPath: relocatedSessionPath }
@@ -698,26 +786,26 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
         } else {
           unknownSessionCount++;
         }
-        continue;
+        return null;
       }
 
       const isCheckpointSession = sessionId === checkpointSessionId;
       const truncateAt = isCheckpointSession
         ? (isPendingFork ? state.forkSource!.resumeAt : conversation.resumeAtMessageId)
         : undefined;
-      const sessionPathOverride = relocatedSessionPaths.get(sessionId);
-      const result = pathContext
-        ? await loadSDKSessionMessages(
-          vaultPath,
-          sessionId,
-          truncateAt,
-          sessionPathOverride,
-          pathContext,
-        )
-        : sessionPathOverride
-          ? await loadSDKSessionMessages(vaultPath, sessionId, truncateAt, sessionPathOverride)
-          : await loadSDKSessionMessages(vaultPath, sessionId, truncateAt);
+      const result = await loadSDKSessionMessages(
+        vaultPath,
+        sessionId,
+        truncateAt,
+        relocatedSessionPaths.get(sessionId),
+        pathContext,
+      );
 
+      return result;
+    }, 4);
+    // Concurrent reads retain source order and checkpoint/partial-failure semantics.
+    for (const result of loaded) {
+      if (!result) continue;
       if (result.error) {
         errorCount++;
         continue;
@@ -729,15 +817,12 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
 
     const allSessionsMissing = missingSessionCount === allSessionIds.length;
     if (successCount === 0 || allSessionsMissing) {
-      return;
+      return { changes: conversation, complete: false };
     }
 
     const filteredSdkMessages = allSdkMessages.filter(msg => !msg.isRebuiltContext);
 
-    const merged = dedupeMessages([
-      ...conversation.messages,
-      ...filteredSdkMessages,
-    ]).sort((a, b) => a.timestamp - b.timestamp);
+    const merged = mergeHistoryMessages(conversation.messages, filteredSdkMessages);
 
     if (state.subagentData) {
       await enrichAsyncSubagentToolCalls(
@@ -751,17 +836,15 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     }
 
     conversation.messages = merged;
-    if (errorCount === 0 && unknownSessionCount === 0) {
-      this.hydratedConversationIds.add(conversation.id);
-    }
+    return { changes: conversation, complete: errorCount === 0 && unknownSessionCount === 0 };
   }
 
-  hasConversationModelRecoverySource(conversation: Conversation): boolean {
+  hasConversationModelRecoverySource(conversation: ProviderHistoryInput): boolean {
     return getClaudeConversationSessionIds(conversation).length > 0;
   }
 
   async recoverConversationModelSelection(
-    conversation: Conversation,
+    conversation: ProviderHistoryInput,
     vaultPath: string | null,
     pathContext?: ProviderHistoryPathContext,
   ): Promise<string | null> {
@@ -771,9 +854,23 @@ export class ClaudeConversationHistoryService implements ProviderConversationHis
     const sessionIds = getClaudeConversationSessionIds(conversation);
     if (sessionIds.length === 0) return null;
 
-    const locations = await (pathContext
-      ? locateSDKSessions(vaultPath, sessionIds, pathContext)
-      : locateSDKSessions(vaultPath, sessionIds));
+    // Reuse locations already resolved for this history; hydration still consumes them.
+    const cache = this.#getSessionLocationCache(conversation, vaultPath, pathContext);
+    const knownLocations = new Map(cache.pending);
+    for (const [sessionId, sessionPath] of cache.relocated) {
+      knownLocations.set(sessionId, { availability: 'relocated', sessionPath });
+    }
+    const locatedSessions = await locateSDKSessions(
+      vaultPath,
+      sessionIds.filter(sessionId => !knownLocations.has(sessionId)),
+      pathContext,
+    );
+    for (const [sessionId, location] of locatedSessions) {
+      if (location.availability === 'relocated' && location.sessionPath) {
+        cache.relocated.set(sessionId, location.sessionPath);
+      }
+    }
+    const locations = new Map([...knownLocations, ...locatedSessions]);
     const isPendingFork = this.isPendingForkConversation(conversation);
     const checkpointSessionId = isPendingFork
       ? state.forkSource!.sessionId

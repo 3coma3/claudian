@@ -85,7 +85,10 @@ export class ComposerEditor {
         ]),
         EditorView.lineWrapping,
         this.placeholderConfig.of(placeholder(this.placeholderText)),
-        EditorView.contentAttributes.of({ 'aria-label': 'Message', 'aria-multiline': 'true', role: 'textbox' }),
+        // CodeMirror turns off native spellcheck and autocorrect, which also disables macOS text replacements.
+        EditorView.contentAttributes.of({
+          'aria-label': 'Message', 'aria-multiline': 'true', role: 'textbox', spellcheck: 'true', autocorrect: 'on',
+        }),
         EditorView.domEventHandlers({ input: event => { event.stopPropagation(); return false; } }),
         EditorView.updateListener.of(update => {
           this.state = update.state;
@@ -136,7 +139,7 @@ export class ComposerEditor {
       }));
     };
     host.setAttribute('data-placeholder', this.placeholderText);
-    host.addEventListener('focus', this.onFocus);
+    host.addEventListener('focusin', this.onFocusIn);
   }
 
   refreshLinks(): void {
@@ -147,15 +150,18 @@ export class ComposerEditor {
 
   destroy(): void {
     this.destroyed = true;
-    this.element.removeEventListener('focus', this.onFocus);
+    this.element.removeEventListener('focusin', this.onFocusIn);
     this.ariaObserver?.disconnect();
     this.removeFileLinkHandler();
     this.view?.destroy();
     this.view = null;
   }
 
-  private readonly onFocus = (): void => {
+  // Chromium skips the `focus` event's `focusin` when the handler moves focus,
+  // which would hide this handoff from ancestors that track focus transitions.
+  private readonly onFocusIn = (event: FocusEvent): void => {
     if (this.destroyed) return;
+    if (event.target !== this.element) return;
     if (!this.view) {
       this.element.replaceChildren();
       this.element.removeAttribute('role');

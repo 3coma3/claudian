@@ -1,3 +1,4 @@
+import { normalizeWarmExecutionLimit } from '@/core/settings/warmExecutionLimits';
 import {
   WarmExecutionCapacityError,
   type WarmExecutionOwner,
@@ -17,7 +18,7 @@ function createOwner(id: string, canCool = true): WarmExecutionOwner & {
 
 describe('WarmExecutionPool', () => {
   it('enforces five as the minimum concurrent running session limit', async () => {
-    const pool = new WarmExecutionPool(() => 3);
+    const pool = new WarmExecutionPool(() => normalizeWarmExecutionLimit(3));
     const protectedOwners = Array.from(
       { length: 5 },
       (_, index) => createOwner(`protected-${index}`, false),
@@ -122,7 +123,7 @@ describe('WarmExecutionPool', () => {
     }
 
     limit = 5;
-    await pool.reconcileLimit();
+    await expect(pool.reconcileLimit()).resolves.toBe(false);
     expect(pool.getWarmCount()).toBe(6);
 
     owners[0].canCool.mockReturnValue(true);
@@ -131,19 +132,6 @@ describe('WarmExecutionPool', () => {
     expect(owners[0].cool).toHaveBeenCalledTimes(1);
     expect(owners[1].cool).not.toHaveBeenCalled();
     expect(pool.getWarmCount()).toBe(5);
-  });
-
-  it('reports when protected owners prevent immediate limit reconciliation', async () => {
-    let limit = 6;
-    const pool = new WarmExecutionPool(() => limit);
-    for (let index = 0; index < 6; index += 1) {
-      await pool.acquire(createOwner(`owner-${index}`, false));
-    }
-
-    limit = 5;
-
-    await expect(pool.reconcileLimit()).resolves.toBe(false);
-    expect(pool.getWarmCount()).toBe(6);
   });
 
   it('touches provider activity when choosing the least-recently-used owner', async () => {

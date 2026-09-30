@@ -1,4 +1,5 @@
 import {
+  cancelSelectedDestinationTurn,
   sendTabInputMessageFromEnterKey,
   sendTabInputMessageFromExplicitEnterShortcut,
 } from '../TabInputEvents';
@@ -23,11 +24,6 @@ export function buildTabRuntimeInputBindings(
   const keydownHandler = (event: KeyboardEvent) => {
     if ((event.target as HTMLElement | null)?.closest?.('button, a')) return;
     const tab = runtimeRef.requirePublished();
-    if (ui.instructionModeManager.isActive()) {
-      ui.instructionModeManager.handleKeydown(event);
-      return;
-    }
-
     if (sendTabInputMessageFromExplicitEnterShortcut(tab, event)) {
       return;
     }
@@ -40,10 +36,11 @@ export function buildTabRuntimeInputBindings(
       return;
     }
 
-    if (event.key === 'Escape' && !event.isComposing && state.isStreaming) {
-      event.preventDefault();
-      controllers.inputController.cancelStreaming();
-      return;
+    if (event.key === 'Escape' && !event.isComposing) {
+      if (cancelSelectedDestinationTurn(tab)) {
+        event.preventDefault();
+        return;
+      }
     }
 
     if (sendTabInputMessageFromEnterKey(tab, plugin.settings, event)) {
@@ -57,19 +54,26 @@ export function buildTabRuntimeInputBindings(
   );
 
   const inputHandler = () => {
-    commitProvisionalTab(runtimeRef.requirePublished());
-    ui.instructionModeManager.handleInputChange();
-    if (!ui.instructionModeManager.isActive()) {
-      ui.composerDropdown.handleInputChange();
-    } else {
-      ui.composerDropdown.hide();
-    }
+    const tab = runtimeRef.requirePublished();
+    commitProvisionalTab(tab);
+    controllers.sideChatController.handleComposerInput();
+    ui.composerDropdown.handleInputChange();
   };
   dom.inputEl.addEventListener('input', inputHandler);
   options.registerCleanup(
     'tab input change binding',
     () => dom.inputEl.removeEventListener('input', inputHandler),
   );
+
+  const composerFocusOut = (event: FocusEvent) => {
+    const target = event.relatedTarget as Node | null;
+    if (target && dom.inputComposerEl.contains(target)) return;
+    controllers.conversationController.cancelBranchDraft();
+  };
+  dom.inputComposerEl.addEventListener('focusout', composerFocusOut);
+  options.registerCleanup('tab branch draft focus binding', () => {
+    dom.inputComposerEl.removeEventListener('focusout', composerFocusOut);
+  });
 
   const scrollThreshold = 20;
   let navigationScrollIntent: 'away' | 'bottom' | null = null;
@@ -182,6 +186,7 @@ export function buildTabRuntimeInputBindings(
   });
 
   const scrollHandler = () => {
+    if (dom.messagesEl.clientHeight > 0) state.readingScrollTop = dom.messagesEl.scrollTop;
     if (!isAutoScrollAllowed()) {
       navigationScrollIntent = null;
       state.autoScrollEnabled = false;

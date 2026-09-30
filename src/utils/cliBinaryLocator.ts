@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { getEnhancedPath } from './env';
-import { expandHomePath, normalizeConfiguredCliPath, parsePathEntries, stripSurroundingQuotes } from './path';
+import { expandHomePath, normalizeConfiguredCLIPath, parsePathEntries, stripSurroundingQuotes } from './path';
 
 export function isExistingFile(filePath: string): boolean {
   try {
@@ -12,9 +12,9 @@ export function isExistingFile(filePath: string): boolean {
   }
 }
 
-export function resolveConfiguredCliPath(configuredPath: string | undefined): string | null {
+export function resolveConfiguredCLIPath(configuredPath: string | undefined): string | null {
   try {
-    const expandedPath = normalizeConfiguredCliPath(configuredPath);
+    const expandedPath = normalizeConfiguredCLIPath(configuredPath);
     if (!expandedPath) {
       return null;
     }
@@ -24,7 +24,7 @@ export function resolveConfiguredCliPath(configuredPath: string | undefined): st
   }
 }
 
-export function findCliBinaryPath(
+export function findCLIBinaryPath(
   binaryName: string,
   additionalPath?: string,
   platform: NodeJS.Platform = process.platform,
@@ -34,9 +34,13 @@ export function findCliBinaryPath(
     : [binaryName];
   const searchEntries = platform === process.platform
     ? parsePathEntries(getEnhancedPath(additionalPath))
-    : parsePathEntriesForPlatform(additionalPath, platform);
+    : parseCLIPathEntries(additionalPath, platform);
 
-  for (const dir of searchEntries) {
+  return findBinaryInDirectories(searchEntries, binaryNames);
+}
+
+export function findBinaryInDirectories(entries: string[], binaryNames: string[]): string | null {
+  for (const dir of entries) {
     if (!dir) continue;
 
     for (const candidateName of binaryNames) {
@@ -50,7 +54,10 @@ export function findCliBinaryPath(
   return null;
 }
 
-function parsePathEntriesForPlatform(pathValue: string | undefined, platform: NodeJS.Platform): string[] {
+export function parseCLIPathEntries(pathValue: string | undefined, platform: NodeJS.Platform): string[] {
+  if (platform === process.platform) {
+    return parsePathEntries(pathValue);
+  }
   if (!pathValue) {
     return [];
   }

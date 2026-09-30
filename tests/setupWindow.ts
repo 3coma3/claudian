@@ -1,8 +1,13 @@
 import { TextDecoder, TextEncoder } from 'node:util';
+import { deserialize, serialize } from 'node:v8';
 
-import { toHaveNoViolations } from 'jest-axe';
+import type * as JestAxe from 'jest-axe';
 
-expect.extend(toHaveNoViolations);
+// Node-only suites do not need to load the accessibility engine.
+if (typeof document !== 'undefined') {
+  const { toHaveNoViolations } = jest.requireActual<typeof JestAxe>('jest-axe');
+  expect.extend(toHaveNoViolations);
+}
 
 type TestWindow = typeof globalThis & {
   cancelAnimationFrame?: (handle: number) => void;
@@ -14,6 +19,13 @@ const testWindow = globalThis as TestWindow;
 
 if (!globalThis.TextEncoder) {
   Object.assign(globalThis, { TextDecoder, TextEncoder });
+}
+
+// jsdom omits Node's structuredClone; V8 serialization implements the same algorithm.
+if (typeof globalThis.structuredClone !== 'function') {
+  Object.assign(globalThis, {
+    structuredClone: <T>(value: T): T => deserialize(serialize(value)) as T,
+  });
 }
 
 if (!testWindow.requestAnimationFrame) {
@@ -63,7 +75,7 @@ if (!testWindow.localStorage) {
 // Polyfill Obsidian DOM helpers for jsdom-based tests.
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-function applyDomElementInfo(el: Element, info: unknown): void {
+function applyDOMElementInfo(el: Element, info: unknown): void {
   if (!info) return;
   if (typeof info === 'string') {
     el.classList.add(...info.split(/\s+/).filter(Boolean));
@@ -93,7 +105,7 @@ function applyDomElementInfo(el: Element, info: unknown): void {
   callback?: (el: HTMLDivElement) => void,
 ): HTMLDivElement {
   const el = document.createElement('div');
-  applyDomElementInfo(el, info);
+  applyDOMElementInfo(el, info);
   if (callback) callback(el);
   return el;
 };
@@ -104,7 +116,7 @@ function applyDomElementInfo(el: Element, info: unknown): void {
   callback?: (el: HTMLElementTagNameMap[K]) => void,
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
-  applyDomElementInfo(el, info);
+  applyDOMElementInfo(el, info);
   if (callback) callback(el);
   return el;
 };
@@ -114,7 +126,7 @@ function applyDomElementInfo(el: Element, info: unknown): void {
   callback?: (el: HTMLSpanElement) => void,
 ): HTMLSpanElement {
   const el = document.createElement('span');
-  applyDomElementInfo(el, info);
+  applyDOMElementInfo(el, info);
   if (callback) callback(el);
   return el;
 };
@@ -125,7 +137,7 @@ function applyDomElementInfo(el: Element, info: unknown): void {
   callback?: (el: SVGElementTagNameMap[K]) => void,
 ): SVGElementTagNameMap[K] {
   const el = document.createElementNS(SVG_NS, tag) as SVGElementTagNameMap[K];
-  applyDomElementInfo(el, info);
+  applyDOMElementInfo(el, info);
   if (callback) callback(el);
   return el;
 };

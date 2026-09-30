@@ -2,6 +2,8 @@
 
 import '@/providers';
 
+import { Component } from 'obsidian';
+
 import { ProviderRegistry } from '@/core/providers/ProviderRegistry';
 import type { ProviderId } from '@/core/providers/types';
 import type { ChatMessage } from '@/core/types';
@@ -18,7 +20,7 @@ const timestamp = 1786528800000;
 function createRenderer(providerId: ProviderId, enabled = true) {
   const messagesEl = document.createElement('div');
   const settings = { mediaFolder: '', showMessageTimestamps: enabled };
-  const component = { registerDomEvent: jest.fn(), register: jest.fn(), addChild: jest.fn() };
+  const component = new Component();
   const renderer = new MessageRenderer(
     { app: {}, settings } as any,
     component as any,
@@ -79,12 +81,12 @@ describe('message timestamp refresh', () => {
     renderer.dispose();
   });
 
-  it('removes a stale timestamp when updating a live user message after disabling', () => {
+  it('removes a user timestamp on refresh after disabling', () => {
     const { renderer, messagesEl, settings } = createRenderer('codex');
     const msg: ChatMessage = { id: 'user', role: 'user', content: 'Hello', timestamp };
     renderer.addMessage(msg);
     settings.showMessageTimestamps = false;
-    renderer.updateLiveUserMessage(msg);
+    renderer.refreshMessageTimestamps();
     expect(messagesEl.querySelectorAll('.claudian-message-timestamp').length).toBe(0);
     renderer.dispose();
   });

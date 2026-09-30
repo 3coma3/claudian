@@ -43,6 +43,55 @@ function match(trigger: string, query = '', atInputStart = true) {
 }
 
 describe('SlashCommandSource', () => {
+  it.each(['instruction', 'review'])('selects provider command /%s with its native metadata', name => {
+    const entry = {
+      ...ENTRY,
+      displayPrefix: '/',
+      id: `provider:command:${name}`,
+      insertPrefix: '/',
+      name,
+    };
+    const source = new SlashCommandSource({
+      providerDiscovery: discovery({ status: 'ready', items: [entry] }),
+    });
+    try {
+      const trigger = match('/', name);
+      const items = source.load(trigger, new AbortController().signal);
+      expect(items).toEqual([
+        expect.objectContaining({ id: entry.id, detail: entry.description, label: `/${name}` }),
+      ]);
+      const item = items[0];
+      if (item.kind !== 'value') throw new Error('Expected a selectable provider command');
+      expect(source.select(item, trigger)).toEqual(expect.objectContaining({
+        kind: 'replace',
+        text: `/${name} `,
+      }));
+    } finally {
+      source.destroy();
+    }
+  });
+
+  it.each(['bt', 'btw', 'BTW'])('finds the side command through alias query %s', query => {
+    const source = new SlashCommandSource();
+    const trigger = match('/', query);
+    const items = source.load(trigger, new AbortController().signal);
+    expect(items).toEqual([
+      expect.objectContaining({ id: 'builtin:side', label: '/side', replacement: '/side ' }),
+    ]);
+    const item = items[0];
+    if (item.kind !== 'value') throw new Error('Expected a selectable side command');
+    expect(source.select(item, trigger)).toEqual(expect.objectContaining({ kind: 'replace', text: '/side ' }));
+    source.destroy();
+  });
+
+  it('keeps alias matches unavailable when built-ins are disabled or the slash is embedded', () => {
+    const source = new SlashCommandSource();
+    expect(source.load(match('/', 'btw', false), new AbortController().signal)).toEqual([]);
+    source.setBuiltInsEnabled(false);
+    expect(source.load(match('/', 'btw'), new AbortController().signal)).toEqual([]);
+    source.destroy();
+  });
+
   it('preserves provider trigger characters and provider insertion prefixes', async () => {
     const source = new SlashCommandSource({
       includeBuiltIns: false,
@@ -62,6 +111,8 @@ describe('SlashCommandSource', () => {
     }));
     const [item] = await source.load(match('$', 'rev'), new AbortController().signal);
     expect(item).toEqual(expect.objectContaining({ label: '$review', replacement: '$review ' }));
+    const action = source.select(item as Extract<typeof item, { kind: 'value' }>, match('$', 'rev'));
+    expect(action).toEqual(expect.objectContaining({ kind: 'replace', text: '$review ' }));
     source.destroy();
   });
 
@@ -122,22 +173,6 @@ describe('SlashCommandSource', () => {
     ]));
     await Promise.resolve();
     expect(providerDiscovery.load).toHaveBeenCalledTimes(1);
-    source.destroy();
-  });
-
-  it('runs the selected command callback after returning a pure text replacement', async () => {
-    const onSelect = jest.fn();
-    const source = new SlashCommandSource({
-      includeBuiltIns: false,
-      onSelect,
-      providerDiscovery: discovery(),
-      providerId: 'codex',
-    });
-    const [item] = await source.load(match('$'), new AbortController().signal);
-    const action = source.select(item as Extract<typeof item, { kind: 'value' }>, match('$'));
-    expect(action).toEqual(expect.objectContaining({ kind: 'replace', text: '$review ' }));
-    if (action.kind === 'replace') action.onApplied?.();
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ name: 'review' }));
     source.destroy();
   });
 });
