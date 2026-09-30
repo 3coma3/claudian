@@ -14,6 +14,8 @@ import {
 export const CLAUDE_SAFE_MODES = ['acceptEdits', 'auto', 'default'] as const;
 export type ClaudeSafeMode = typeof CLAUDE_SAFE_MODES[number];
 export type ClaudeSettingSource = 'user' | 'project' | 'local';
+export const CLAUDE_PERMISSION_DESTINATIONS = ['localSettings', 'projectSettings'] as const;
+export type ClaudePermissionDestination = typeof CLAUDE_PERMISSION_DESTINATIONS[number];
 
 export interface ClaudeProviderSettings {
   enabled: boolean;
@@ -21,6 +23,7 @@ export interface ClaudeProviderSettings {
   cliPath: string;
   cliPathsByHost: HostnameCliPaths;
   loadUserSettings: boolean;
+  permissionDestination: ClaudePermissionDestination;
   enableChrome: boolean;
   customModels: string;
   defaultModel: string;
@@ -37,6 +40,7 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS: Readonly<ClaudeProviderSettings> 
   cliPath: '',
   cliPathsByHost: {},
   loadUserSettings: true,
+  permissionDestination: 'localSettings',
   enableChrome: false,
   customModels: '',
   defaultModel: 'opus',
@@ -50,6 +54,14 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS: Readonly<ClaudeProviderSettings> 
 function normalizeClaudeSafeMode(value: unknown): ClaudeSafeMode | undefined {
   return (CLAUDE_SAFE_MODES as readonly unknown[]).includes(value)
     ? value as ClaudeSafeMode
+    : undefined;
+}
+
+function normalizeClaudePermissionDestination(
+  value: unknown,
+): ClaudePermissionDestination | undefined {
+  return (CLAUDE_PERMISSION_DESTINATIONS as readonly unknown[]).includes(value)
+    ? value as ClaudePermissionDestination
     : undefined;
 }
 
@@ -103,6 +115,8 @@ export function getClaudeProviderSettings(
         DEFAULT_CLAUDE_PROVIDER_SETTINGS.loadUserSettings,
       ),
     ),
+    permissionDestination: normalizeClaudePermissionDestination(config.permissionDestination)
+      ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.permissionDestination,
     enableChrome: readStoredBoolean(
       config.enableChrome,
       readStoredBoolean(settings.enableChrome, DEFAULT_CLAUDE_PROVIDER_SETTINGS.enableChrome),
@@ -154,6 +168,10 @@ export function updateClaudeProviderSettings(
     safeMode: 'safeMode' in updates
       ? normalizeClaudeSafeMode(updates.safeMode) ?? current.safeMode
       : current.safeMode,
+    permissionDestination: 'permissionDestination' in updates
+      ? normalizeClaudePermissionDestination(updates.permissionDestination)
+        ?? current.permissionDestination
+      : current.permissionDestination,
   };
   setProviderConfig(settings, 'claude', next);
   return next;

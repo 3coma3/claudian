@@ -18,7 +18,9 @@ import {
   resolveClaudeModelSelection,
 } from '../modelOptions';
 import {
+  CLAUDE_PERMISSION_DESTINATIONS,
   CLAUDE_SAFE_MODES,
+  type ClaudePermissionDestination,
   type ClaudeSafeMode,
   getClaudeProviderSettings,
   updateClaudeProviderSettings,
@@ -237,6 +239,25 @@ export const claudeSettingsTabRenderer: ProviderSettingsTabRenderer = {
             });
           })
       );
+
+    new Setting(container)
+      .setName(t('settings.permissionDestination.name'))
+      .setDesc(t('settings.permissionDestination.desc'))
+      .addDropdown((dropdown) => {
+        for (const destination of CLAUDE_PERMISSION_DESTINATIONS) {
+          dropdown.addOption(destination, t(`settings.permissionDestination.${destination}`));
+        }
+        dropdown
+          .setValue(claudeSettings.permissionDestination)
+          .onChange(async (value) => {
+            await context.plugin.mutateSettings((settings) => {
+              updateClaudeProviderSettings(
+                settings,
+                { permissionDestination: value as ClaudePermissionDestination },
+              );
+            });
+          });
+      });
 
     // --- Slash Commands ---
 

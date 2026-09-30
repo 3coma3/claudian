@@ -539,6 +539,12 @@
       "name": "Cargar configuración de usuario Claude",
       "desc": "Carga ~/.claude/settings.json. Cuando está habilitado, las reglas de permisos del usuario pueden eludir el modo seguro."
     },
+    "permissionDestination": {
+      "name": "Guardar reglas de «Permitir siempre» en",
+      "desc": "Dónde guarda Claude Code las reglas que apruebas de forma permanente. La configuración local (.claude/settings.local.json) la ignora Git y se queda en este equipo; la configuración del proyecto (.claude/settings.json) se comparte con todos los que usan la bóveda.",
+      "localSettings": "Configuración local",
+      "projectSettings": "Configuración del proyecto"
+    },
     "claudeSafeMode": {
       "name": "Modo seguro",
       "desc": "Modo de permisos usado cuando el interruptor Seguro está activo."

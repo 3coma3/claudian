@@ -749,6 +749,26 @@ describe('ClaudeSettingsTab', () => {
     expect(mockSaveSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('persists where always-allow rules are saved', async () => {
+    const plugin = createPlugin();
+    const context = createContext(plugin);
+
+    claudeSettingsTabRenderer.render(createContainer(), context);
+
+    const dropdown = findSetting('settings.permissionDestination.name').dropdownComponents[0];
+
+    expect(dropdown.value).toBe('localSettings');
+    expect(dropdown.options).toEqual([
+      { value: 'localSettings', label: 'settings.permissionDestination.localSettings' },
+      { value: 'projectSettings', label: 'settings.permissionDestination.projectSettings' },
+    ]);
+
+    await dropdown.onChangeCallback?.('projectSettings');
+
+    expect(plugin.settings.providerConfigs.claude.permissionDestination).toBe('projectSettings');
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+  });
+
   it('reconciles removed custom models on blur and clears stale title model selections', async () => {
     const plugin = createPlugin({
       titleGenerationModel: 'claude-opus-4-6',

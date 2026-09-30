@@ -539,6 +539,12 @@
       "name": "ユーザーClaude設定を読み込む",
       "desc": "~/.claude/settings.json を読み込みます。有効にすると、ユーザーの Claude Code 許可ルールがセキュリティモードをバイパスする可能性があります。"
     },
+    "permissionDestination": {
+      "name": "「常に許可」ルールの保存先",
+      "desc": "永続的に承認したルールを Claude Code が保存する場所です。ローカル設定（.claude/settings.local.json）は Git で無視され、このマシンにのみ残ります。プロジェクト設定（.claude/settings.json）は保管庫を使うすべての人と共有されます。",
+      "localSettings": "ローカル設定",
+      "projectSettings": "プロジェクト設定"
+    },
     "claudeSafeMode": {
       "name": "セーフモード",
       "desc": "Safe トグルが有効なときに使用する権限モードです。"

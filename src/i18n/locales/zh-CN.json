@@ -539,6 +539,12 @@
       "name": "加载用户 Claude 设置",
       "desc": "加载 ~/.claude/settings.json。启用后，用户的 Claude Code 权限规则可能绕过安全模式。"
     },
+    "permissionDestination": {
+      "name": "“始终允许”规则保存位置",
+      "desc": "Claude Code 保存永久批准规则的位置。本地设置（.claude/settings.local.json）被 Git 忽略，仅保留在本机；项目设置（.claude/settings.json）与所有使用该仓库的人共享。",
+      "localSettings": "本地设置",
+      "projectSettings": "项目设置"
+    },
     "claudeSafeMode": {
       "name": "安全模式",
       "desc": "启用 Safe 开关时使用的权限模式。"

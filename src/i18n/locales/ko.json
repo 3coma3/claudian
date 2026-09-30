@@ -539,6 +539,12 @@
       "name": "사용자 Claude 설정 로드",
       "desc": "~/.claude/settings.json을 로드합니다. 활성화하면 사용자의 Claude Code 허용 규칙이 보안 모드를 우회할 수 있습니다."
     },
+    "permissionDestination": {
+      "name": "\"항상 허용\" 규칙 저장 위치",
+      "desc": "영구적으로 승인한 규칙을 Claude Code가 저장하는 위치입니다. 로컬 설정(.claude/settings.local.json)은 Git에서 무시되며 이 기기에만 남습니다. 프로젝트 설정(.claude/settings.json)은 볼트를 사용하는 모든 사람과 공유됩니다.",
+      "localSettings": "로컬 설정",
+      "projectSettings": "프로젝트 설정"
+    },
     "claudeSafeMode": {
       "name": "안전 모드",
       "desc": "Safe 토글이 활성화되었을 때 사용하는 권한 모드입니다."

@@ -539,6 +539,12 @@
       "name": "Benutzer-Claude-Einstellungen laden",
       "desc": "Lädt ~/.claude/settings.json. Wenn aktiviert, können Benutzer-Claude-Code-Berechtigungsregeln den Sicherheitsmodus umgehen."
     },
+    "permissionDestination": {
+      "name": "„Immer erlauben“-Regeln speichern in",
+      "desc": "Wo Claude Code dauerhaft genehmigte Regeln speichert. Lokale Einstellungen (.claude/settings.local.json) werden von Git ignoriert und bleiben auf diesem Gerät; Projekteinstellungen (.claude/settings.json) werden mit allen geteilt, die den Vault nutzen.",
+      "localSettings": "Lokale Einstellungen",
+      "projectSettings": "Projekteinstellungen"
+    },
     "claudeSafeMode": {
       "name": "Sicherheitsmodus",
       "desc": "Berechtigungsmodus, der verwendet wird, wenn der Safe-Schalter aktiv ist."

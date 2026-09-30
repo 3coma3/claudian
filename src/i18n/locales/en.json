@@ -539,6 +539,12 @@
       "name": "Load user Claude settings",
       "desc": "Load ~/.claude/settings.json. When enabled, user's Claude Code permission rules may bypass Safe mode."
     },
+    "permissionDestination": {
+      "name": "Save \"Always allow\" rules to",
+      "desc": "Where Claude Code stores rules you approve permanently. Local settings (.claude/settings.local.json) are git-ignored and stay on this machine; project settings (.claude/settings.json) are shared with everyone who uses the vault.",
+      "localSettings": "Local settings",
+      "projectSettings": "Project settings"
+    },
     "claudeSafeMode": {
       "name": "Safe mode",
       "desc": "Permission mode used when the Safe toggle is active."

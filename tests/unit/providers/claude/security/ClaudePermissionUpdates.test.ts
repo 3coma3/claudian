@@ -1,12 +1,33 @@
 import { buildPersistentPermissionUpdates } from '@/providers/claude/security/ClaudePermissionUpdates';
 
 describe('buildPersistentPermissionUpdates', () => {
-  it('constructs a project allow rule from the action', () => {
+  it('constructs a local allow rule from the action by default', () => {
     const updates = buildPersistentPermissionUpdates('Bash', { command: 'git status' });
     expect(updates).toEqual([{
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git status' }],
+      destination: 'localSettings',
+    }]);
+  });
+
+  it('writes rules to the requested settings destination', () => {
+    const suggestions = [{
+      type: 'addRules' as const,
+      behavior: 'allow' as const,
+      rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
+      destination: 'session' as const,
+    }];
+    expect(buildPersistentPermissionUpdates('Bash', { command: 'ls' }, [], 'projectSettings')).toEqual([{
+      type: 'addRules',
+      behavior: 'allow',
+      rules: [{ toolName: 'Bash', ruleContent: 'ls' }],
+      destination: 'projectSettings',
+    }]);
+    expect(buildPersistentPermissionUpdates('Bash', { command: 'git status' }, suggestions, 'projectSettings')).toEqual([{
+      type: 'addRules',
+      behavior: 'allow',
+      rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
       destination: 'projectSettings',
     }]);
   });
@@ -23,7 +44,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     }]);
   });
 
@@ -33,7 +54,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'ls' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     }]);
   });
 
@@ -61,7 +82,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Read', ruleContent: '/external/path/*' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     });
     expect(updates[1]).toEqual({
       type: 'addDirectories',
@@ -84,7 +105,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'ls' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     });
     expect(updates[1]).toEqual({
       type: 'removeDirectories',
@@ -107,7 +128,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'echo hi' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     });
     expect(updates[1]).toEqual({
       type: 'setMode',
@@ -145,7 +166,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'replaceRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     });
   });
 
@@ -164,7 +185,7 @@ describe('buildPersistentPermissionUpdates', () => {
     expect(updates[0]).toMatchObject({
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git status' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     });
     expect(updates[1].type).toBe('removeRules');
   });
@@ -214,7 +235,7 @@ describe('buildPersistentPermissionUpdates', () => {
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
-      destination: 'projectSettings',
+      destination: 'localSettings',
     }]);
   });
 });

@@ -30,6 +30,7 @@ import {
 } from '../../../utils/session';
 import type { ClaudeWorkspaceServices } from '../app/ClaudeWorkspaceServices';
 import { executeClaudeRewind } from '../runtime/ClaudeRewindService';
+import { getClaudeProviderSettings } from '../settings';
 import { getClaudeState } from '../types/providerState';
 import { ClaudeExecutionEventNormalizer } from './ClaudeExecutionEventNormalizer';
 import {
@@ -154,6 +155,9 @@ ClaudeExecutionStrategySink {
       isToolAllowed: (toolName) => (
         this.lastAllowedTools === null
         || this.lastAllowedTools.has(toolName)
+      ),
+      getPermissionDestination: () => (
+        getClaudeProviderSettings(this.host.settings).permissionDestination
       ),
       onToolBlocked: (toolUseId) => {
         this.eventNormalizer.markToolBlocked(

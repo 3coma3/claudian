@@ -5,7 +5,7 @@ jest.mock('@/utils/env', () => ({
   getHostnameKey: () => mockGetHostnameKey(),
 }));
 
-import { getClaudeProviderSettings } from '@/providers/claude/settings';
+import { getClaudeProviderSettings, updateClaudeProviderSettings } from '@/providers/claude/settings';
 
 describe('Claude settings normalization', () => {
   it('normalizes mixed CLI maps without interpreting host-shaped keys', () => {
@@ -28,5 +28,24 @@ describe('Claude settings normalization', () => {
     expect(getClaudeProviderSettings({
       providerConfigs: { claude: { cliPathsByHost: ['/array/claude'] } },
     }).cliPathsByHost).toEqual({});
+  });
+
+  it('saves always-allow rules to local settings unless project settings are chosen', () => {
+    expect(getClaudeProviderSettings({}).permissionDestination).toBe('localSettings');
+    expect(getClaudeProviderSettings({
+      providerConfigs: { claude: { permissionDestination: 'projectSettings' } },
+    }).permissionDestination).toBe('projectSettings');
+    expect(getClaudeProviderSettings({
+      providerConfigs: { claude: { permissionDestination: 'userSettings' } },
+    }).permissionDestination).toBe('localSettings');
+  });
+
+  it('ignores an unsupported always-allow destination update', () => {
+    const settings: Record<string, unknown> = {
+      providerConfigs: { claude: { permissionDestination: 'projectSettings' } },
+    };
+    expect(updateClaudeProviderSettings(settings, {
+      permissionDestination: 'session' as never,
+    }).permissionDestination).toBe('projectSettings');
   });
 });

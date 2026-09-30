@@ -539,6 +539,12 @@
       "name": "Charger les paramètres utilisateur Claude",
       "desc": "Charge ~/.claude/settings.json. Lorsqu'activé, les règles de permission de l'utilisateur peuvent contourner le mode sécurisé."
     },
+    "permissionDestination": {
+      "name": "Enregistrer les règles « Toujours autoriser » dans",
+      "desc": "Où Claude Code enregistre les règles que vous approuvez définitivement. Les paramètres locaux (.claude/settings.local.json) sont ignorés par Git et restent sur cette machine ; les paramètres du projet (.claude/settings.json) sont partagés avec tous ceux qui utilisent le coffre.",
+      "localSettings": "Paramètres locaux",
+      "projectSettings": "Paramètres du projet"
+    },
     "claudeSafeMode": {
       "name": "Mode sécurisé",
       "desc": "Mode d'autorisation utilisé lorsque le bouton Safe est actif."

@@ -2,6 +2,7 @@ import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
 
 import type { ProviderInteractionPort } from '@/core/execution';
 import { createClaudeExecutionCanUseTool } from '@/providers/claude/execution/ClaudeInteractionHandler';
+import type { ClaudePermissionDestination } from '@/providers/claude/settings';
 
 function createPort(): jest.Mocked<ProviderInteractionPort> {
   return {
@@ -20,12 +21,14 @@ function createPort(): jest.Mocked<ProviderInteractionPort> {
 function createHandler(
   port: jest.Mocked<ProviderInteractionPort>,
   onToolBlocked: jest.Mock = jest.fn(),
+  permissionDestination: ClaudePermissionDestination = 'localSettings',
 ): CanUseTool {
   return createClaudeExecutionCanUseTool({
     interactionPort: port,
     sessionInstanceId: 'session-local',
     getTurnId: () => 'turn-local',
     isToolAllowed: () => true,
+    getPermissionDestination: () => permissionDestination,
     onToolBlocked,
   });
 }
@@ -87,10 +90,26 @@ describe('createClaudeExecutionCanUseTool', () => {
         type: 'addRules',
         behavior: 'allow',
         rules: [{ toolName: 'Bash', ruleContent: 'git *' }],
-        destination: 'projectSettings',
+        destination: 'localSettings',
       }],
       decisionClassification: 'user_permanent',
     });
+  });
+
+  it('saves always-allow rules to the configured settings destination', async () => {
+    const port = createPort();
+    const handler = createHandler(port, jest.fn(), 'projectSettings');
+
+    const result = await handler('Bash', { command: 'ls' }, nativeOptions);
+
+    expect(result).toEqual(expect.objectContaining({
+      updatedPermissions: [{
+        type: 'addRules',
+        behavior: 'allow',
+        rules: [{ toolName: 'Bash', ruleContent: 'ls' }],
+        destination: 'projectSettings',
+      }],
+    }));
   });
 
   it('routes approvals with stable native/local identity and dismisses the exact interaction', async () => {
@@ -179,6 +198,7 @@ describe('createClaudeExecutionCanUseTool', () => {
       sessionInstanceId: 'session-local',
       getTurnId: () => 'turn-local',
       isToolAllowed: (toolName) => toolName === 'Read',
+      getPermissionDestination: () => 'localSettings',
       onToolBlocked: jest.fn(),
     });
 
