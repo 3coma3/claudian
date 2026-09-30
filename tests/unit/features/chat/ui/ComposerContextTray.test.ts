@@ -46,6 +46,7 @@ describe('ComposerContextTray', () => {
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
 
     expect(containerEl.hasClass('has-content')).toBe(false);
+    expect(containerEl.dataset.contextSlots).toBeUndefined();
 
     tray.setItems('images', [{
       id: 'image-1',
@@ -69,6 +70,8 @@ describe('ComposerContextTray', () => {
     }]);
 
     expect(containerEl.hasClass('has-content')).toBe(true);
+    // Presentations can match on which slots are filled without inspecting chips.
+    expect(containerEl.dataset.contextSlots).toBe('linked-content editor-selection images');
     expect(containerEl.querySelectorAll('.claudian-context-chip').map((item: any) => item.dataset.contextSlot)).toEqual([
       'linked-content',
       'editor-selection',
@@ -172,6 +175,39 @@ describe('ComposerContextTray', () => {
     expect(containerEl.querySelector('.claudian-context-more')?.hasClass('claudian-hidden')).toBe(true);
   });
 
+  it('measures rows from rendered chips only, ignoring chips a presentation hides', () => {
+    const containerEl = createMockEl();
+    const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
+    tray.setItems('linked-content', [{ id: 'note', kind: 'content', label: 'Note.md', onRemove: jest.fn() }]);
+    tray.setItems('images', Array.from({ length: 3 }, (_, index) => ({
+      id: `image-${index}`,
+      kind: 'image' as const,
+      label: `image-${index}.png`,
+      onRemove: jest.fn(),
+    })));
+
+    // Hidden elements report no offset parent and a zero position.
+    const chips = containerEl.querySelectorAll('.claudian-context-chip');
+    const layout = (visibleTops: number[]) => [null, ...visibleTops].forEach((offsetTop, index) => {
+      Object.defineProperties(chips[index], {
+        offsetParent: { configurable: true, value: offsetTop === null ? null : containerEl },
+        offsetTop: { configurable: true, value: offsetTop ?? 0 },
+        offsetHeight: { configurable: true, value: offsetTop === null ? 0 : 24 },
+      });
+    });
+    const moreButton = containerEl.querySelector('.claudian-context-more');
+
+    layout([8, 8, 8]);
+    tray.refreshLayout();
+    expect(moreButton?.hasClass('claudian-hidden')).toBe(true);
+
+    layout([8, 8, 46]);
+    tray.refreshLayout();
+    expect(moreButton?.textContent).toBe('+1 more');
+    expect(chips[3].hasClass('claudian-context-chip--overflow-hidden')).toBe(true);
+    expect(chips[1].hasClass('claudian-context-chip--overflow-hidden')).toBe(false);
+  });
+
   it('removes the tray when the final owner clears its items', () => {
     const containerEl = createMockEl();
     const tray = new ComposerContextTray(containerEl as unknown as HTMLElement);
@@ -185,6 +221,7 @@ describe('ComposerContextTray', () => {
     tray.clearItems('canvas-selection');
 
     expect(containerEl.hasClass('has-content')).toBe(false);
+    expect(containerEl.dataset.contextSlots).toBeUndefined();
     expect(containerEl.children).toHaveLength(0);
   });
 });

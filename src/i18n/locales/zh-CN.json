@@ -73,6 +73,21 @@
       "startFailed": "侧边对话启动失败：{error}",
       "queued": "已加入侧聊队列。",
       "busySide": "侧边对话仍在回复，请等待其完成。"
+    },
+    "zen": {
+      "regionLabel": "Claudian 聊天",
+      "showHistory": "显示对话",
+      "working": "处理中…",
+      "thinking": "思考中…",
+      "interrupted": "已中断",
+      "workedFor": "工作了 {duration}",
+      "workedForResult": "工作了 {duration} · {result}",
+      "actionRequired": "需要你的输入",
+      "error": "错误：{message}",
+      "toolRunning": "{tool} · 运行中",
+      "toolCompleted": "{tool} · 已完成",
+      "toolFailed": "{tool} · 失败",
+      "toolBlocked": "{tool} · 已阻止"
     }
   },
   "settings": {
@@ -241,6 +256,10 @@
       "rightSidebar": "右侧边栏",
       "leftSidebar": "左侧边栏",
       "mainTab": "主编辑器标签页"
+    },
+    "enableZenMode": {
+      "name": "启用禅模式",
+      "desc": "侧边栏隐藏时，保持显示精简的聊天界面。"
     },
     "cliInstallation": {
       "disclosure": "{name} 安装",

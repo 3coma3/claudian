@@ -194,6 +194,7 @@ export class StreamController {
           await this.finalizeCurrentTextBlock(msg);
         }
         await this.appendThinking(chunk.content);
+        state.recordActivity({ kind: 'thinking' });
         break;
 
       case 'text':
@@ -204,6 +205,7 @@ export class StreamController {
         }
         msg.content += chunk.content;
         await this.appendText(chunk.content);
+        state.recordActivity({ kind: 'text', text: state.currentTextEl ? state.currentTextContent : msg.content });
         break;
 
       case 'citations': {
@@ -277,7 +279,7 @@ export class StreamController {
       case 'error':
         // Flush pending tools before rendering error message
         this.#flushPendingTools();
-        await this.appendText(`\n\n❌ **Error:** ${chunk.content}`);
+        await this.appendError(chunk.content, '❌ **Error:**');
         break;
 
       case 'done':
@@ -333,6 +335,11 @@ export class StreamController {
 
       default:
         break;
+    }
+
+    if (chunk.type === 'tool_use' || chunk.type === 'tool_result') {
+      const tool = msg.toolCalls?.find(candidate => candidate.id === chunk.id);
+      if (tool) state.recordActivity({ kind: 'tool', tool });
     }
 
     this.scrollToBottom();
@@ -826,6 +833,12 @@ export class StreamController {
   // ============================================
   // Text Block Management
   // ============================================
+
+  /** Renders a terminal error and publishes it as the latest activity. */
+  async appendError(message: string, label = '**Error:**'): Promise<void> {
+    await this.appendText(`\n\n${label} ${message}`);
+    this.deps.state.recordActivity({ kind: 'error', message });
+  }
 
   async appendText(text: string): Promise<void> {
     const { state } = this.deps;

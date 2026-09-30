@@ -1323,6 +1323,29 @@ describe('ClaudianView tab controls', () => {
     expect(view.isWideSessionLayout).toBe(false);
   });
 
+  it('keeps dual mode and its previews while the view has no width, as in a collapsed sidebar', () => {
+    const viewContainerEl = createMockEl();
+    viewContainerEl.addClass('claudian-wide-session-layout');
+    const view = Object.create(ClaudianView.prototype) as any;
+    attachSessionBrowser(view);
+    const discardProvisionalTabs = jest.fn().mockResolvedValue(undefined);
+    Object.assign(view, {
+      cancelSessionSidebarRendering: jest.fn(),
+      isWideSessionLayout: true,
+      requestedWideSessionLayout: true,
+      sessionLayoutRequestRevision: 0,
+      tabManager: { discardProvisionalTabs, getAllTabs: jest.fn().mockReturnValue([]) },
+      viewContainerEl,
+    });
+
+    view.updateSessionSidebarLayout(0);
+
+    expect(discardProvisionalTabs).not.toHaveBeenCalled();
+    expect(view.pendingSessionLayoutTransition ?? null).toBeNull();
+    expect(view.isWideSessionLayout).toBe(true);
+    expect(viewContainerEl.hasClass('claudian-wide-session-layout')).toBe(true);
+  });
+
   it('cancels a pending compact transition when the view becomes wide again', async () => {
     const viewContainerEl = createMockEl();
     viewContainerEl.addClass('claudian-wide-session-layout');
@@ -2239,6 +2262,7 @@ describe('ClaudianView runtime tab initialization', () => {
         ensureConversationMetadataLoaded: jest.fn().mockResolvedValue(undefined),
         registerTabWorkspaceStateDelivery: jest.fn()
           .mockReturnValue(readyTabWorkspaceStateDelivery()),
+        registerZenModeSource: jest.fn(() => jest.fn()),
         settings: { restoreTabsOnStartup: true },
       },
       sessionSidebarWidth: null,
@@ -2343,6 +2367,7 @@ describe('ClaudianView runtime tab initialization', () => {
         ensureConversationMetadataLoaded: jest.fn().mockResolvedValue(undefined),
         registerTabWorkspaceStateDelivery: jest.fn()
           .mockReturnValue(readyTabWorkspaceStateDelivery()),
+        registerZenModeSource: jest.fn(() => jest.fn()),
         settings: { restoreTabsOnStartup: true },
       },
       restoreActiveInputToTabContent: jest.fn(),
@@ -2361,9 +2386,15 @@ describe('ClaudianView runtime tab initialization', () => {
     });
 
     await view.onOpenImpl();
+    expect(view.plugin.registerZenModeSource).toHaveBeenCalledWith(view);
+    expect(view.getZenRuntime()).toBeNull();
+    const unregisterZen = view.plugin.registerZenModeSource.mock.results[0].value as jest.Mock;
     const restoring = view.setState({}, { history: false });
     await Promise.resolve();
     const closing = view.onClose();
+    // Zen presentation returns synchronously, before asynchronous shutdown begins.
+    expect(unregisterZen).toHaveBeenCalledTimes(1);
+    expect(unregisterZen.mock.invocationCallOrder[0]).toBeLessThan(beginShutdown.mock.invocationCallOrder[0]);
     persistedState.resolve({ activeTabId: null, openTabs: [] });
     await expect(Promise.all([restoring, closing])).resolves.toEqual([undefined, undefined]);
 
@@ -2416,6 +2447,7 @@ describe('ClaudianView runtime tab initialization', () => {
         claimLegacyTabManagerState,
         completeLegacyTabManagerStateMigration: jest.fn().mockResolvedValue(undefined),
         ensureConversationMetadataLoaded: jest.fn().mockResolvedValue(undefined),
+        registerZenModeSource: jest.fn(() => jest.fn()),
         settings: { restoreTabsOnStartup: true },
       },
       notifyConversationNavigationChanged: jest.fn(),
@@ -2499,6 +2531,7 @@ describe('ClaudianView runtime tab initialization', () => {
         claimLegacyTabManagerState,
         completeLegacyTabManagerStateMigration: jest.fn().mockResolvedValue(undefined),
         ensureConversationMetadataLoaded: jest.fn().mockResolvedValue(undefined),
+        registerZenModeSource: jest.fn(() => jest.fn()),
         settings: { restoreTabsOnStartup: false },
       },
       notifyConversationNavigationChanged: jest.fn(),
