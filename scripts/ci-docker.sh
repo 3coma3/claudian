@@ -41,10 +41,11 @@
 # (RSA key generation and node-forge signing) exceed Jest's 5-second
 # timeout. Jest workers default to 3, as in CI's test jobs.
 #
-# Memory defaults to 6g: ESLint's type-aware lint peaks at about 4.3 GB,
-# and the kernel kills it in a smaller container.
+# Memory defaults to 8g: ESLint's type-aware lint has peaked at 4.3 GB on
+# one machine and at 6.1 GB (resident, all processes) on another, where the
+# kernel killed it now and then in a 6g container.
 #
-# Environment: CI_BASE (origin/main), CI_RELEASE_TAG, CI_MEMORY (6g),
+# Environment: CI_BASE (origin/main), CI_RELEASE_TAG, CI_MEMORY (8g),
 # CI_CPUS (4), CI_JEST_WORKERS (3), CI_TIMEOUT seconds per container
 # (1800), CI_KEEP_GOING=0 to stop at the first failing step, CI_SKIP a
 # space-separated list of steps to leave out (actionlint lockfile typecheck
@@ -57,7 +58,7 @@ root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 node_version=$(tr -d '[:space:]' < "$root/.node-version")
 actionlint_version=$(sed -n 's#.*docker://rhysd/actionlint:\([0-9.]*\).*#\1#p' \
   "$root/.github/workflows/ci.yml" | head -1)
-memory=${CI_MEMORY:-6g}
+memory=${CI_MEMORY:-8g}
 cpus=${CI_CPUS:-4}
 workers=${CI_JEST_WORKERS:-3}
 limit=${CI_TIMEOUT:-1800}
@@ -106,7 +107,7 @@ echo "ci-docker: base ${base:-none (as a push)}${base_commit:+ (merge base ${bas
 memory_kb=$(numfmt --from=iec "${memory^^}" 2>/dev/null) && memory_kb=$((memory_kb / 1024))
 if [ -n "${memory_kb:-}" ] && [ "$available_kb" -lt "$memory_kb" ]; then
   echo "ci-docker: warning: less memory available than the container may use;" \
-    "lint needs about 4.3 GB (CI_SKIP=lint leaves it out)"
+    "lint needs up to about 6 GB (CI_SKIP=lint leaves it out)"
 fi
 
 echo "== actionlint ${actionlint_version:-latest}"
