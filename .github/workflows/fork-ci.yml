@@ -1,0 +1,18 @@
+# The fork's own trigger for upstream's CI: ci.yml runs on upstream's
+# branches only, and calling it here keeps it unchanged, so merging upstream
+# releases into `release` never conflicts on it.
+name: Fork CI
+
+on:
+  push:
+    branches: [release]
+  pull_request:
+    branches: [release]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
