@@ -14,6 +14,7 @@ import {
   encodeCollabProjectCheckpointManifestCanonicalJson,
 } from '@claudian-collab/protocol';
 import { TEST_INSTALLATION_A } from '@test/helpers/installations';
+import { testClock, testTime } from '@test/helpers/testClock';
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
 
 import {
@@ -58,9 +59,9 @@ function status(
     batchRevision: null,
     batchSha256: null,
     checkpointSha256,
-    createdAt: '2026-08-28T00:00:00.000Z',
+    createdAt: testTime({ days: 1 }),
     direction,
-    expiresAt: '2026-09-27T00:00:00.000Z',
+    expiresAt: testTime({ days: 31 }),
     phase,
     projectId: PROJECT_ID,
     relinquishmentProof: null,
@@ -74,8 +75,8 @@ function status(
     targetUrl,
     transferId: TRANSFER_ID,
     updatedAt: phase === 'collecting-readiness'
-      ? '2026-08-28T00:00:00.000Z'
-      : '2026-08-28T00:01:00.000Z',
+      ? testTime({ days: 1 })
+      : testTime({ days: 1, minutes: 1 }),
   };
 }
 
@@ -147,7 +148,7 @@ describe('production authority-transfer effects', () => {
         if (kind === 'operation') return 'create-production-effects';
         return PROJECT_ID;
       },
-      now: () => new Date('2026-08-08T00:00:00.000Z'),
+      now: testClock({ days: -19 }),
       vaultRoot: sourceRoot,
     });
     const sourceFeature = createCollabFeatureSubcomposition({
@@ -166,7 +167,7 @@ describe('production authority-transfer effects', () => {
         ) VALUES (
           'member-production-peer', 'Bob',
           'refs/heads/members/member-production-peer', 'member', 'active', ?,
-          NULL, '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:00.000Z', NULL
+          NULL, '${testTime({ days: -19 })}', '${testTime({ days: -19 })}', NULL
         )
       `, [Buffer.alloc(32, 8)]);
     });
@@ -352,8 +353,8 @@ describe('production authority-transfer effects', () => {
     });
     const snapshot: CollabCloudProjectSnapshot = {
       currentMember: {
-        activatedAt: '2026-08-08T00:00:00.000Z',
-        createdAt: '2026-08-08T00:00:00.000Z',
+        activatedAt: testTime({ days: -19 }),
+        createdAt: testTime({ days: -19 }),
         displayName: sourceMembership.member.displayName,
         id: MEMBER_ID,
         personalRef: sourceMembership.member.personalRef,
@@ -476,7 +477,7 @@ describe('production authority-transfer effects', () => {
       certificate: Buffer.alloc(64, 4).toString('base64url'),
       certificateAlgorithm: 'ed25519' as const,
       checkpointSha256: staged.checkpointSha256,
-      committedAt: '2026-08-28T00:02:00.000Z',
+      committedAt: testTime({ days: 1, minutes: 2 }),
       operationIntentId: OPERATION_ID,
       projectId: PROJECT_ID,
       sourceAuthority: { generation: 2, kind: 'cloud' as const },
@@ -496,7 +497,7 @@ describe('production authority-transfer effects', () => {
       phase: 'completed',
       relinquishmentProof,
       state: 'completed',
-      updatedAt: '2026-08-28T00:03:00.000Z',
+      updatedAt: testTime({ days: 1, minutes: 3 }),
     };
     const completedRecord = createAuthorityTransferRecord({
       ownerInstallationKey: TEST_INSTALLATION_A,
