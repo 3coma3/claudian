@@ -160,6 +160,12 @@
       "name": "Claude-Code-Benutzereinstellungen laden",
       "desc": "Lädt die Claude-Code-Konfiguration auf Benutzerebene aus ~/.claude: settings.json, Skills, Befehle, Agenten und Plugins. Wenn deaktiviert, ist nur die Konfiguration auf Vault-Ebene verfügbar. Wenn aktiviert, können Benutzer-Berechtigungsregeln den Sicherheitsmodus umgehen."
     },
+    "permissionDestination": {
+      "name": "„Immer erlauben“-Regeln speichern in",
+      "desc": "Wo Claude Code dauerhaft genehmigte Regeln speichert. Lokale Einstellungen (.claude/settings.local.json) werden von Git ignoriert und bleiben auf diesem Gerät; Projekteinstellungen (.claude/settings.json) werden mit allen geteilt, die den Vault nutzen.",
+      "localSettings": "Lokale Einstellungen",
+      "projectSettings": "Projekteinstellungen"
+    },
     "codexSafeMode": {
       "name": "Sicherheitsmodus",
       "desc": "Sandbox-Modus, der verwendet wird, wenn der Safe-Schalter aktiv ist."

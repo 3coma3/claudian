@@ -11,6 +11,8 @@ import { type ClaudeDiscoveredModel, decodeClaudeModels } from './modelCatalog';
 
 export type ClaudeResponseStyle = 'Default' | 'Concise';
 type ClaudeSettingSource = 'user' | 'project' | 'local';
+export const CLAUDE_PERMISSION_DESTINATIONS = ['localSettings', 'projectSettings'] as const;
+export type ClaudePermissionDestination = typeof CLAUDE_PERMISSION_DESTINATIONS[number];
 
 export interface ClaudeProviderSettings {
   enabled: boolean;
@@ -18,6 +20,7 @@ export interface ClaudeProviderSettings {
   cliPath: string;
   cliPathsByHost: HostnameCLIPaths;
   loadUserSettings: boolean;
+  permissionDestination: ClaudePermissionDestination;
   enableChrome: boolean;
   discoveredModels: ClaudeDiscoveredModel[];
   /** Ordered enabled SDK identities; null seeds selections from legacy configuration. */
@@ -33,6 +36,7 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS: Readonly<ClaudeProviderSettings> 
   cliPath: '',
   cliPathsByHost: {},
   loadUserSettings: true,
+  permissionDestination: 'projectSettings',
   enableChrome: false,
   discoveredModels: [],
   // Fresh configurations have no saved selections to migrate. A stored config
@@ -42,6 +46,14 @@ export const DEFAULT_CLAUDE_PROVIDER_SETTINGS: Readonly<ClaudeProviderSettings> 
   environmentVariables: '',
   environmentHash: '',
 });
+
+function normalizeClaudePermissionDestination(
+  value: unknown,
+): ClaudePermissionDestination | undefined {
+  return (CLAUDE_PERMISSION_DESTINATIONS as readonly unknown[]).includes(value)
+    ? value as ClaudePermissionDestination
+    : undefined;
+}
 
 export function getClaudeProviderSettings(
   settings: Record<string, unknown>,
@@ -66,6 +78,8 @@ export function getClaudeProviderSettings(
       config.loadUserSettings,
       DEFAULT_CLAUDE_PROVIDER_SETTINGS.loadUserSettings,
     ),
+    permissionDestination: normalizeClaudePermissionDestination(config.permissionDestination)
+      ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.permissionDestination,
     enableChrome: readStoredBoolean(
       config.enableChrome,
       DEFAULT_CLAUDE_PROVIDER_SETTINGS.enableChrome,
@@ -106,6 +120,10 @@ export function updateClaudeProviderSettings(
     ...current,
     ...updates,
     modelAliases: decodeModelAliases(updates.modelAliases ?? current.modelAliases),
+    permissionDestination: 'permissionDestination' in updates
+      ? normalizeClaudePermissionDestination(updates.permissionDestination)
+        ?? current.permissionDestination
+      : current.permissionDestination,
   };
   setProviderConfig(settings, 'claude', next);
   return next;

@@ -160,6 +160,12 @@
       "name": "ユーザーの Claude Code 設定を読み込む",
       "desc": "~/.claude からユーザーレベルの Claude Code 設定（settings.json、スキル、コマンド、エージェント、プラグイン）を読み込みます。無効にすると、Vault レベルの設定のみ利用できます。有効にすると、ユーザーの許可ルールがセキュリティモードをバイパスする可能性があります。"
     },
+    "permissionDestination": {
+      "name": "「常に許可」ルールの保存先",
+      "desc": "永続的に承認したルールを Claude Code が保存する場所です。ローカル設定（.claude/settings.local.json）は Git で無視され、このマシンにのみ残ります。プロジェクト設定（.claude/settings.json）は保管庫を使うすべての人と共有されます。",
+      "localSettings": "ローカル設定",
+      "projectSettings": "プロジェクト設定"
+    },
     "codexSafeMode": {
       "name": "セーフモード",
       "desc": "Safe トグルが有効なときに使用するサンドボックスモードです。"

@@ -160,6 +160,12 @@
       "name": "Carregar configurações do usuário do Claude Code",
       "desc": "Carrega a configuração do Claude Code no nível do usuário a partir de ~/.claude: settings.json, skills, comandos, agentes e plugins. Quando desabilitado, apenas a configuração no nível do cofre fica disponível. Quando habilitado, as regras de permissão do usuário podem ignorar o modo seguro."
     },
+    "permissionDestination": {
+      "name": "Salvar regras de \"Sempre permitir\" em",
+      "desc": "Onde o Claude Code salva as regras que você aprova permanentemente. As configurações locais (.claude/settings.local.json) são ignoradas pelo Git e ficam nesta máquina; as configurações do projeto (.claude/settings.json) são compartilhadas com todos que usam o cofre.",
+      "localSettings": "Configurações locais",
+      "projectSettings": "Configurações do projeto"
+    },
     "codexSafeMode": {
       "name": "Modo seguro",
       "desc": "Modo de sandbox usado quando o controle Safe está ativo."

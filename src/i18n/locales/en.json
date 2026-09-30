@@ -160,6 +160,12 @@
       "name": "Load user Claude Code settings",
       "desc": "Load user-level Claude Code configuration from ~/.claude: settings.json, skills, commands, agents, and plugins. When disabled, only vault-level configuration is available. When enabled, user permission rules may bypass Safe mode."
     },
+    "permissionDestination": {
+      "name": "Save \"Always allow\" rules to",
+      "desc": "Where Claude Code stores rules you approve permanently. Local settings (.claude/settings.local.json) are git-ignored and stay on this machine; project settings (.claude/settings.json) are shared with everyone who uses the vault.",
+      "localSettings": "Local settings",
+      "projectSettings": "Project settings"
+    },
     "codexSafeMode": {
       "name": "Safe mode",
       "desc": "Sandbox mode used when the Safe toggle is active."

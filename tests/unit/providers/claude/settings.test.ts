@@ -41,4 +41,23 @@ describe('Claude settings normalization', () => {
       providerConfigs: { claude: { cliPathsByHost: ['/array/claude'] } },
     }).cliPathsByHost).toEqual({});
   });
+
+  it('saves always-allow rules to project settings unless local settings are chosen', () => {
+    expect(getClaudeProviderSettings({}).permissionDestination).toBe('projectSettings');
+    expect(getClaudeProviderSettings({
+      providerConfigs: { claude: { permissionDestination: 'localSettings' } },
+    }).permissionDestination).toBe('localSettings');
+    expect(getClaudeProviderSettings({
+      providerConfigs: { claude: { permissionDestination: 'userSettings' } },
+    }).permissionDestination).toBe('projectSettings');
+  });
+
+  it('ignores an unsupported always-allow destination update', () => {
+    const settings: Record<string, unknown> = {
+      providerConfigs: { claude: { permissionDestination: 'localSettings' } },
+    };
+    expect(updateClaudeProviderSettings(settings, {
+      permissionDestination: 'session' as never,
+    }).permissionDestination).toBe('localSettings');
+  });
 });

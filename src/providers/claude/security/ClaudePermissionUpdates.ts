@@ -1,11 +1,13 @@
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 
 import { getActionPattern } from '../../../core/security/approvalRules';
+import type { ClaudePermissionDestination } from '../settings';
 
 export function buildPersistentPermissionUpdates(
   toolName: string,
   input: Record<string, unknown>,
-  suggestions?: PermissionUpdate[]
+  suggestions?: PermissionUpdate[],
+  destination: ClaudePermissionDestination = 'projectSettings',
 ): PermissionUpdate[] {
   const processed: PermissionUpdate[] = [];
   let hasRuleUpdate = false;
@@ -22,7 +24,7 @@ export function buildPersistentPermissionUpdates(
           ...suggestion,
           rules: scopedRules,
           behavior: 'allow',
-          destination: 'projectSettings',
+          destination,
         });
       } else {
         processed.push(suggestion);
@@ -39,7 +41,7 @@ export function buildPersistentPermissionUpdates(
       type: 'addRules',
       behavior: 'allow',
       rules: [{ toolName, ruleContent: pattern }],
-      destination: 'projectSettings',
+      destination,
     });
   }
 

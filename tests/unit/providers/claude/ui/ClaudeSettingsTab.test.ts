@@ -417,6 +417,25 @@ describe('ClaudeSettingsTab', () => {
     expect(await axe(subtree)).toHaveNoViolations();
   });
 
+  it('persists where always-allow rules are saved', async () => {
+    const plugin = createPlugin();
+
+    createSettingsRenderer().render(createContainer(), createContext(plugin));
+
+    const dropdown = findSetting('settings.permissionDestination.name').dropdownComponents[0];
+
+    expect(dropdown.value).toBe('projectSettings');
+    expect(dropdown.options).toEqual([
+      { value: 'localSettings', label: 'settings.permissionDestination.localSettings' },
+      { value: 'projectSettings', label: 'settings.permissionDestination.projectSettings' },
+    ]);
+
+    await dropdown.onChangeCallback?.('localSettings');
+
+    expect(plugin.settings.providerConfigs.claude.permissionDestination).toBe('localSettings');
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+  });
+
   it('persists Claude enablement inside its execution transition and refreshes model options', async () => {
     let transitionActive = false;
     const plugin = createPlugin();

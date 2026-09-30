@@ -20,6 +20,8 @@ import {
   getClaudeModelOptions,
 } from '../modelOptions';
 import {
+  CLAUDE_PERMISSION_DESTINATIONS,
+  type ClaudePermissionDestination,
   getClaudeProviderSettings,
   updateClaudeProviderSettings,
 } from '../settings';
@@ -177,6 +179,26 @@ export function createClaudeSettingsTabRenderer(
               });
             })
         );
+
+      new Setting(container)
+        .setName(t('settings.permissionDestination.name'))
+        .setDesc(t('settings.permissionDestination.desc'))
+        .addDropdown((dropdown) => {
+          dropdown.selectEl.setAttribute('aria-label', t('settings.permissionDestination.name'));
+          for (const destination of CLAUDE_PERMISSION_DESTINATIONS) {
+            dropdown.addOption(destination, t(`settings.permissionDestination.${destination}`));
+          }
+          dropdown
+            .setValue(claudeSettings.permissionDestination)
+            .onChange(async (value) => {
+              await context.plugin.mutateSettings((settings) => {
+                updateClaudeProviderSettings(
+                  settings,
+                  { permissionDestination: value as ClaudePermissionDestination },
+                );
+              });
+            });
+        });
 
       // --- Environment ---
 

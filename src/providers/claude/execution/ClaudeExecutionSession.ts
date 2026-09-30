@@ -35,6 +35,7 @@ import { assertClaudeModelAvailable } from '../runtime/ClaudeModelAvailability';
 import { executeClaudeRewind } from '../runtime/ClaudeRewindService';
 import { buildClaudeSDKUserMessage } from '../runtime/ClaudeUserMessageFactory';
 import { toClaudeDiscoveredModel } from '../runtime/probeClaudeModels';
+import { getClaudeProviderSettings } from '../settings';
 import { classifyClaudeError, getClaudeInvalidationReason } from './classifyClaudeError';
 import { ClaudeExecutionEventNormalizer } from './ClaudeExecutionEventNormalizer';
 import {
@@ -172,6 +173,9 @@ ClaudeExecutionStrategySink {
       isToolAllowed: (toolName) => (
         this.lastAllowedTools === null
         || this.lastAllowedTools.has(toolName)
+      ),
+      getPermissionDestination: () => (
+        getClaudeProviderSettings(this.host.settings).permissionDestination
       ),
       onToolBlocked: (toolUseId) => {
         this.eventNormalizer.markToolBlocked(

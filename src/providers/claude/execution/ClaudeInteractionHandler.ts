@@ -12,12 +12,14 @@ import {
   TOOL_ASK_USER_QUESTION,
 } from '../../../core/tools/toolNames';
 import { buildPersistentPermissionUpdates } from '../security/ClaudePermissionUpdates';
+import type { ClaudePermissionDestination } from '../settings';
 
 export interface ClaudeExecutionInteractionDeps {
   readonly interactionPort: ProviderInteractionPort;
   readonly sessionInstanceId: string;
   readonly getTurnId: (toolId: string) => string | null;
   readonly isToolAllowed: (toolName: string) => boolean;
+  readonly getPermissionDestination: () => ClaudePermissionDestination;
   readonly onToolBlocked: (toolUseId: string) => void;
 }
 
@@ -129,6 +131,7 @@ export class ClaudeInteractionHandler {
             toolName,
             input,
             options.suggestions,
+            this.deps.getPermissionDestination(),
           ),
           decisionClassification: 'user_permanent',
         };
